@@ -51,6 +51,15 @@ export interface TokiState {
   demo?: boolean
 }
 
+export interface TokiSettings {
+  privacy: boolean
+  theme: "system" | "light" | "dark"
+}
+
+export function defaultSettings(): TokiSettings {
+  return { privacy: false, theme: "system" }
+}
+
 /** Widget-facing, de-identified snapshot. NEVER include token.value or identity.value. */
 export interface WidgetSnapshot {
   v: 1

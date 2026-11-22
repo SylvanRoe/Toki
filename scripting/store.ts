@@ -1,4 +1,4 @@
-import { TokiState, WidgetSnapshot, emptyState } from "./types"
+import { TokiState, WidgetSnapshot, TokiSettings, defaultSettings, emptyState, Identity, Account, Token } from "./types"
 
 // Toki keeps one JSON file in the App Group directory so the home-screen
 // widget (a separate extension context) can read a de-identified snapshot.
@@ -71,6 +71,64 @@ export function importPayload(raw: string): TokiState {
 
 export function exportPayload(state: TokiState): string {
   return JSON.stringify({ app: "toki", version: 2, exportedAt: new Date().toISOString(), ...state }, null, 2)
+}
+
+// ---- settings (Storage persists asynchronously, no need to touch the state file) ----
+const SETTINGS_KEY = "toki.settings"
+export function loadSettings(): TokiSettings {
+  return (Storage.get<TokiSettings>(SETTINGS_KEY) as TokiSettings) || defaultSettings()
+}
+export function saveSettings(s: TokiSettings): void {
+  Storage.set(SETTINGS_KEY, s)
+}
+
+// ---- CRUD helpers with tombstones (mirrors web/app.js save()) ----
+function tombstone(state: TokiState, id: string, ts: number): TokiState {
+  const deleted = { ...state.deleted, [id]: ts }
+  return { ...state, deleted }
+}
+
+export function upsertIdentity(state: TokiState, item: Identity): TokiState {
+  const exists = state.identities.some(x => x.id === item.id)
+  const identities = exists
+    ? state.identities.map(x => (x.id === item.id ? item : x))
+    : [...state.identities, item]
+  return { ...state, identities }
+}
+export function upsertAccount(state: TokiState, item: Account): TokiState {
+  const exists = state.accounts.some(x => x.id === item.id)
+  const accounts = exists
+    ? state.accounts.map(x => (x.id === item.id ? item : x))
+    : [...state.accounts, item]
+  return { ...state, accounts }
+}
+export function upsertToken(state: TokiState, item: Token): TokiState {
+  const exists = state.tokens.some(x => x.id === item.id)
+  const tokens = exists
+    ? state.tokens.map(x => (x.id === item.id ? item : x))
+    : [item, ...state.tokens]
+  return { ...state, tokens }
+}
+
+export function deleteIdentity(state: TokiState, id: string): TokiState {
+  const next: TokiState = {
+    ...state,
+    identities: state.identities.filter(x => x.id !== id),
+    accounts: state.accounts.map(a => ({ ...a, identityIds: a.identityIds.filter(i => i !== id) })),
+  }
+  return tombstone(next, id, Date.now())
+}
+export function deleteAccount(state: TokiState, id: string): TokiState {
+  return tombstone({ ...state, accounts: state.accounts.filter(x => x.id !== id) }, id, Date.now())
+}
+export function deleteToken(state: TokiState, id: string): TokiState {
+  return tombstone({ ...state, tokens: state.tokens.filter(x => x.id !== id) }, id, Date.now())
+}
+export function clearAll(state: TokiState): TokiState {
+  const ts = Date.now()
+  const deleted = { ...state.deleted }
+  for (const x of [...state.identities, ...state.accounts, ...state.tokens]) deleted[x.id] = ts
+  return { identities: [], accounts: [], tokens: [], deleted }
 }
 
 export const PATHS = { DATA_FILE, SNAP_FILE }
