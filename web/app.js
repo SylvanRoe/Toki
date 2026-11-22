@@ -270,7 +270,7 @@
   let toastTimer;
   function toast(msg, action) {
     const t = $('#toast');
-    t.innerHTML = `<img class="ti" src="icon.png?v=4" alt=""><span class="tx"><span class="tn">账号星图</span><span class="tt">${esc(msg)}</span></span>${action ? `<button>${esc(action.label)}</button>` : ''}`;
+    t.innerHTML = `<img class="ti" src="icon.png?v=4" alt=""><span class="tx"><span class="tn">Toki</span><span class="tt">${esc(msg)}</span></span>${action ? `<button>${esc(action.label)}</button>` : ''}`;
     if (action) t.querySelector('button').onclick = () => { action.fn(); t.classList.remove('show'); };
     t.classList.add('show');
     clearTimeout(toastTimer); toastTimer = setTimeout(() => t.classList.remove('show'), action ? 4500 : 2200);
@@ -481,8 +481,9 @@
     const v = $('#siteList');
     if (!state.accounts.length) { v.innerHTML = `<div class="empty"><h3>还没有网站</h3><p>记下一个网站或 App，选上它用的是哪个邮箱、哪个手机号。</p><button class="btn-filled" data-new="account">添加网站或 App</button></div>`; $('#filters').innerHTML = ''; return; }
     const counts = {};
-    state.accounts.forEach(a => counts[a.category] = (counts[a.category] || 0) + 1);
-    const cats = CATS.filter(c => counts[c]);
+    state.accounts.forEach(a => { const c = a.category || '其他'; counts[c] = (counts[c] || 0) + 1; });
+    // 自定义分类按预设顺序排前，其余按名称补充，确保手填分类也能显示
+    const cats = [...CATS.filter(c => counts[c]), ...Object.keys(counts).filter(c => !CATS.includes(c)).sort(zh)];
     if (ui.cat !== '全部' && !counts[ui.cat]) ui.cat = '全部';
     $('#filters').innerHTML = ['全部', ...cats].map(c => `<button class="${c === ui.cat ? 'active' : ''}" data-cat="${c}">${c}</button>`).join('');
     const shown = ui.cat === '全部' ? cats : [ui.cat];
@@ -842,14 +843,14 @@
         ${idPicksHtml(sel, '用哪个邮箱或手机号注册、绑定的')}
         <p class="hint">可以多选，比如用邮箱注册、再绑定手机号；用微信或 Apple 登录的，选下面的登录账号。</p>
         <div class="sec-title">分类</div>
-        <div class="group"><div class="cats" id="catPicks">${CATS.map(c => `<button class="${c === cat ? 'active' : ''}" data-c="${c}">${c}</button>`).join('')}</div></div>
+        <div class="group"><div class="field"><label>分类</label><input id="aCategory" list="aCatList" value="${esc(cat || '')}" placeholder="手填分类，可自定义" autocomplete="off"><datalist id="aCatList">${CATS.map(c => `<option value="${esc(c)}"></option>`).join('')}</datalist></div></div>
         <div class="sec-title">备注</div>
-        <div class="group"><div class="field stack"><textarea id="aNotes" placeholder="是否开了两步验证、用户名、会员到期日">${esc(a.notes || '')}</textarea></div></div>
+        <div class="group"><div class="field stack notes-field"><label>备注</label><textarea id="aNotes" placeholder="是否开了两步验证、用户名、会员到期日">${esc(a.notes || '')}</textarea></div></div>
         <p class="hint">不要在这里填写密码。</p>
       </div>`, { kind: 'form' });
     setTimeout(() => {
-      const setCat = c => { cat = c; $$('#catPicks button').forEach(x => x.classList.toggle('active', x.dataset.c === c)); };
-      $$('#catPicks button').forEach(b => b.onclick = () => setCat(b.dataset.c));
+      const setCat = c => { cat = c; const el = $('#aCategory'); if (el) el.value = c; };
+      $('#aCategory')?.addEventListener('input', e => { cat = e.target.value.trim(); });
       wirePicks(sel);
       const hero = () => {
         const name = $('#aName').value.trim(), dom = cleanDomain($('#aDomain').value);
@@ -1354,9 +1355,22 @@
       const idx = id => ids.findIndex(i => i.id === id);
       const first = a => { const ks = a.identityIds.map(idx).filter(k => k >= 0); return ks.length ? Math.min(...ks) : 1e3; };
       const apps = state.accounts.slice().sort((a, b) => first(a) - first(b) || b.identityIds.length - a.identityIds.length || zh(a.name, b.name));
-      const ay = {}; apps.forEach((a, k) => ay[a.id] = k * ROW + ROW / 2);
-      const H = Math.max(apps.length * ROW, ids.length * 78, 120);
-      // each card sits at the middle of its apps, then nudge apart so cards never overlap
+      // 把每条密钥按 accountId 归到对应账号下；未关联的放进 loose 组
+      const toksByAcc = {}, tokY = {}, loose = [];
+      apps.forEach(a => toksByAcc[a.id] = []);
+      (state.tokens || []).forEach(t => { if (t.accountId && toksByAcc[t.accountId]) toksByAcc[t.accountId].push(t); else loose.push(t); });
+      // 账号纵向位置：每个账号至少占一行，密钥多时按行数撑开
+      const ay = {};
+      let cursor = 0;
+      apps.forEach(a => {
+        const rows = Math.max(1, toksByAcc[a.id].length);
+        ay[a.id] = cursor + rows * ROW / 2;
+        toksByAcc[a.id].forEach((t, k) => tokY[t.id] = cursor + k * ROW + ROW / 2);
+        cursor += rows * ROW;
+      });
+      loose.forEach((t, k) => tokY[t.id] = cursor + k * ROW + ROW / 2);
+      const H = Math.max(cursor + loose.length * ROW, ids.length * 78, 120);
+      // each identity card sits at the middle of its apps, then nudge apart so cards never overlap
       let pos = ids.map(i => { const ys = accountsOf(i.id).map(a => ay[a.id]); return { i, y: ys.length ? ys.reduce((s, v) => s + v, 0) / ys.length : H }; });
       // emails first, then phone numbers, then login cards, with a small label above each group
       pos.sort((p, q) => TR(p.i.type) - TR(q.i.type) || p.y - q.y);
@@ -1366,27 +1380,42 @@
       for (let k = 0; k < pos.length; k++) pos[k].y = Math.max(pos[k].y, minY[k]);
       const over = pos.length ? pos[pos.length - 1].y - (H - half) : 0;
       if (over > 0) for (let k = pos.length - 1; k >= 0; k--) { pos[k].y = Math.min(pos[k].y, k === pos.length - 1 ? H - half : pos[k + 1].y - GAP - (brk.has(k + 1) ? LBL : 0)); pos[k].y = Math.max(pos[k].y, minY[k]); }
-      // the group label can push cards past the app column, so grow the box to fit them
       const H2 = Math.max(H, pos.length ? pos[pos.length - 1].y + half : 0);
-      return { apps, ay, pos, H: H2, brk };
+      return { apps, ay, pos, H: H2, brk, toksByAcc, tokY, loose };
     }
     function render() {
       const box = $('#mapBox'); if (!box) return;
       const n = state.accounts.length, multi = state.accounts.filter(a => a.identityIds.length > 1).length;
-      $('#graphSummary').textContent = n ? `${state.identities.length} 个身份，${n} 个网站与 App` + (multi ? `，${multi} 个绑了不止一个` : '') : '';
+      const ntok = (state.tokens || []).length;
+      $('#graphSummary').textContent = n ? `${state.identities.length} 个身份，${n} 个网站与 App` + (ntok ? `，${ntok} 条密钥` : '') + (multi ? `，${multi} 个绑了不止一个` : '') : '';
       if (!state.identities.length || !n) { box.innerHTML = `<div class="empty"><h3>还没有可以连线的</h3><p>添加一个邮箱或手机号，再给它记几个网站，这里就会连起来。</p><button class="btn-filled" data-new="${state.identities.length ? 'account' : 'identity'}">${state.identities.length ? '添加网站或 App' : '添加邮箱或手机号'}</button></div>`; return; }
-      const { apps, ay, pos, H, brk } = layout();
-      const W = box.clientWidth || 350, L = Math.min(150, Math.round(W * .38)), R = L + Math.max(56, Math.round(W * .17));
-      const paths = [];
+      const { apps, ay, pos, H, brk, toksByAcc, tokY, loose } = layout();
+      const W = box.clientWidth || 350, L = Math.min(130, Math.round(W * .30));
+      const R = L + Math.max(48, Math.round(W * .13));          // 账号列起点
+      const T = R + Math.max(96, Math.round(W * .28));         // 密钥列起点
+      const AWW = Math.max(80, T - R - 10);                    // 账号卡宽度
+      const TW = Math.max(0, W - T - 2);                       // 密钥卡宽度
+      const paths = [], tpaths = [];
       for (const p of pos) for (const a of accountsOf(p.i.id)) {
         const y1 = p.y, y2 = ay[a.id], mx = (L + R) / 2;
         paths.push(`<path data-i="${p.i.id}" data-a="${a.id}" style="--c:${p.i.color}" d="M${L} ${y1.toFixed(1)}C${mx} ${y1.toFixed(1)} ${mx} ${y2.toFixed(1)} ${R - 6} ${y2.toFixed(1)}"/>`);
       }
+      // 账号 → 密钥 连线
+      for (const a of apps) for (const t of toksByAcc[a.id]) {
+        const y1 = ay[a.id], y2 = tokY[t.id], mx = (R + AWW + T) / 2;
+        tpaths.push(`<path class="tok-thread" data-a="${a.id}" data-t="${t.id}" style="--c:${t.color || '#0a84ff'}" d="M${R + AWW} ${y1.toFixed(1)}C${mx} ${y1.toFixed(1)} ${mx} ${y2.toFixed(1)} ${T - 6} ${y2.toFixed(1)}"/>`);
+      }
+      const tokCard = t => `<button class="mtok" data-map-token="${t.id}" style="top:${tokY[t.id] - 22}px;left:${T}px;width:${TW}px;--c:${esc(t.color || '#0a84ff')}" title="${esc(t.name)}"><span class="mtok-i">${esc((t.name || 'T').slice(0, 1).toUpperCase())}</span><span class="mtok-n">${esc(t.name)}</span><span class="mtok-c">${esc(t.category || '其他')}</span></button>`;
       box.style.height = H + 'px';
-      box.innerHTML = `<svg class="threads" viewBox="0 0 ${W} ${H}" style="width:${W}px;height:${H}px" aria-hidden="true">${paths.join('')}</svg>
+      box.innerHTML = `<svg class="threads" viewBox="0 0 ${W} ${H}" style="width:${W}px;height:${H}px" aria-hidden="true">${paths.join('')}${tpaths.join('')}</svg>
+        <span class="mcol-head" style="left:0;width:${L}px">身份</span>
+        <span class="mcol-head" style="left:${R}px;width:${AWW}px">账号</span>
+        <span class="mcol-head" style="left:${T}px;width:${TW}px">密钥</span>
         ${pos.map((p, k) => (k === 0 || brk.has(k)) ? `<span class="mgroup" style="top:${p.y - 31 - 24}px;width:${L}px">${p.i.type === 'phone' ? ICON.phone + '手机号' : p.i.type === 'login' ? ICON.login + '登录' : ICON.email + '邮箱'}</span>` : '').join('')}
         ${pos.map(p => { const c = accountsOf(p.i.id).length; return `<button class="mcard" data-map-identity="${p.i.id}" style="top:${p.y - 31}px;width:${L}px;--c:${p.i.color};--g:${skin(p.i.color)}"><span class="mk">${idGlyph(p.i)}<b>${c}</b></span><span class="mv">${esc(p.i.label || display(p.i))}</span>${p.i.label ? `<span class="ms">${esc(display(p.i))}</span>` : ''}</button>`; }).join('')}
-        ${apps.map(a => `<button class="mapp ${a.identityIds.length ? '' : 'loose'}" data-account="${a.id}" style="top:${ay[a.id] - ROW / 2}px;left:${R}px">${favIcon(a)}<span class="mn">${esc(a.name)}${handle(a)}</span>${a.identityIds.length > 1 ? `<span class="mdots">${a.identityIds.map(idById).filter(Boolean).map(i => `<i style="--c:${i.color}"></i>`).join('')}</span>` : ''}</button>`).join('')}`;
+        ${apps.map(a => `<button class="mapp ${a.identityIds.length ? '' : 'loose'}" data-account="${a.id}" style="top:${ay[a.id] - ROW / 2}px;left:${R}px;width:${AWW}px">${favIcon(a)}<span class="mn">${esc(a.name)}${handle(a)}</span>${a.identityIds.length > 1 ? `<span class="mdots">${a.identityIds.map(idById).filter(Boolean).map(i => `<i style="--c:${i.color}"></i>`).join('')}</span>` : ''}</button>`).join('')}
+        ${apps.flatMap(a => toksByAcc[a.id]).map(tokCard).join('')}
+        ${loose.map(tokCard).join('')}`;
       built = dataVer + ':' + W;
       apply(); if (running) draw();
     }
@@ -1402,12 +1431,18 @@
       const box = $('#mapBox'); if (!box) return;
       box.classList.toggle('focus', !!sel);
       const linked = new Set(sel ? accountsOf(sel).map(a => a.id) : []);
-      $$('.threads path', box).forEach(p => p.classList.toggle('on', p.dataset.i === sel));
+      const linkedToks = new Set();
+      if (sel) (state.tokens || []).forEach(t => { if (t.accountId && linked.has(t.accountId)) linkedToks.add(t.id); });
+      $$('.threads path:not(.tok-thread)', box).forEach(p => p.classList.toggle('on', p.dataset.i === sel));
+      $$('.threads path.tok-thread', box).forEach(p => p.classList.toggle('on', linked.has(p.dataset.a)));
       $$('.mcard', box).forEach(c => c.classList.toggle('on', c.dataset.mapIdentity === sel));
       $$('.mapp', box).forEach(c => c.classList.toggle('on', linked.has(c.dataset.account)));
+      $$('.mtok', box).forEach(c => c.classList.toggle('on', linkedToks.has(c.dataset.mapToken)));
     }
     document.addEventListener('click', e => {
       if (ui.tab !== 'graph' || e.target.closest('.sheet,.menu,#tabbar,.top')) return;
+      const tk = e.target.closest('[data-map-token]');
+      if (tk) { window.TokiTokens?.edit?.(tk.dataset.mapToken); return; }
       const c = e.target.closest('[data-map-identity]');
       if (c) { const id = c.dataset.mapIdentity; if (sel === id) showIdentity(id); else { sel = id; apply(); } return; }
       if (!e.target.closest('.mapp') && sel) { sel = null; apply(); }
@@ -1433,7 +1468,7 @@
 
   // ---------- end-to-end encrypted sync (Gitee or GitHub private gist) ----------
   const Sync = (() => {
-    const CONF = 'atlas.sync', FILE = 'atlas.enc.json', DESC = '账号星图 · 加密数据（只有同步密码能解开）';
+    const CONF = 'atlas.sync', FILE = 'atlas.enc.json', DESC = 'Toki · 加密数据（只有同步密码能解开）';
     const enc = new TextEncoder(), dec = new TextDecoder();
     const b64 = buf => btoa(String.fromCharCode(...new Uint8Array(buf)));
     const unb64 = s => Uint8Array.from(atob(s), c => c.charCodeAt(0));
@@ -1650,7 +1685,7 @@
   }
   if (!state.identities.some(i => i.type === ui.kind)) { const t = state.identities.find(i => KINDS.includes(i.type)); if (t) ui.kind = t.type; }
 
-  window.TokiTokens?.install({ getState: () => state, save, render, toast, openSheet, closeSheet, confirmSheet, refreshSheet });
+  window.TokiTokens?.install({ getState: () => state, save, render, toast, openSheet, closeSheet, confirmSheet, refreshSheet, makeIcon });
   paintTheme(); render(); Sync.init(); Sync.listeners.forEach(f => f());
   const first = cur();
   $('#glow').style.setProperty('--accent', first ? first.color : '#3a3a3c'); glowColor = first ? first.color : '#3a3a3c';
