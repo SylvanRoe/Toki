@@ -240,6 +240,8 @@ main{max-width:820px;margin:0 auto;padding:0 0 calc(110px + env(safe-area-inset-
 .field textarea{resize:none;min-height:88px;line-height:1.4}
 .field input::placeholder,.field textarea::placeholder{color:var(--tertiary)}
 .field.stack{flex-direction:column;align-items:stretch}
+.field.stack label{width:auto;padding:12px 0 0;font-size:13px;color:var(--secondary);font-weight:500}
+.field.stack textarea{padding:6px 0 12px}
 .hint{font-size:13px;color:var(--secondary);margin:8px 16px 0;line-height:1.4}
 .field.invalid input{animation:shake .4s}
 @keyframes shake{25%{transform:translateX(-5px)}50%{transform:translateX(5px)}75%{transform:translateX(-3px)}}
@@ -425,15 +427,27 @@ body.is-empty main .block, body.is-empty #dots{display:none}
 .mcard:has(.ms) .mv{margin-top:2px}
 .map.focus .mcard{opacity:.4}
 .map.focus .mcard.on{opacity:1;transform:scale(1.04)}
-.mapp{position:absolute;right:0;height:54px;display:flex;align-items:center;gap:10px;text-align:left;transition:opacity .3s}
-.mapp .icon{width:34px;height:34px;border-radius:9px}
-.mapp .fav.letter{font-size:15px}
-.mn{font-size:14.5px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0;flex:1}
+.mapp{position:absolute;height:54px;display:flex;align-items:center;gap:8px;text-align:left;transition:opacity .3s;padding-right:4px}
+.mapp .icon{width:30px;height:30px;border-radius:8px;flex:none}
+.mapp .fav.letter{font-size:14px}
+.mn{font-size:13.5px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0;flex:1}
 .mdots{display:flex;gap:3px;flex:none;padding-right:2px}
-.mdots i{width:7px;height:7px;border-radius:50%;background:var(--c)}
+.mdots i{width:6px;height:6px;border-radius:50%;background:var(--c)}
 .mapp.loose .icon{opacity:.5}
 .map.focus .mapp{opacity:.28}
 .map.focus .mapp.on{opacity:1}
+/* 关系图列标题 + 密钥列 */
+.mcol-head{position:absolute;top:-18px;font-size:11px;font-weight:600;color:var(--tertiary);letter-spacing:.08em;white-space:nowrap}
+.tok-thread{stroke-dasharray:none!important}
+.mtok{position:absolute;height:44px;display:flex;align-items:center;gap:8px;text-align:left;padding:0 8px;border-radius:10px;
+  background:color-mix(in srgb,var(--c) 16%,var(--fill));border:1px solid color-mix(in srgb,var(--c) 32%,transparent);
+  transition:opacity .3s,transform .3s var(--bounce)}
+.mtok:active{transform:scale(.96)}
+.mtok-i{width:24px;height:24px;border-radius:7px;flex:none;display:grid;place-items:center;font-size:12px;font-weight:700;color:#fff;background:var(--c)}
+.mtok-n{font-size:12.5px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0;flex:1}
+.mtok-c{font-size:10px;color:var(--secondary);flex:none;max-width:44px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.map.focus .mtok{opacity:.28}
+.map.focus .mtok.on{opacity:1;transform:scale(1.03)}
 .map-tip{color:var(--tertiary);font-size:13px;margin:22px 20px 0}
 .map .empty{padding-top:60px}
 
@@ -794,14 +808,21 @@ html[data-theme=light] .prov-pills button.on[data-p=apple]{background:#1d1d1f;co
 .tok-value.revealed{color:var(--label,#f5f5f7);user-select:all}
 .tok-meta{font-size:11.5px;color:var(--tertiary);margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .tok-meta .expired{color:var(--red)}.tok-meta .soon{color:#ff9f0a}
+.tok-meta .tok-acc{color:var(--tint);font-weight:600}
 .tok-actions{display:flex;gap:4px;flex:none}
 .tok-actions button{width:34px;height:34px;border-radius:10px;display:grid;place-items:center;color:var(--secondary);background:rgba(255,255,255,.08)}
 .tok-actions button:active{background:rgba(255,255,255,.18);transform:scale(.9)}
 .tok-actions svg{width:17px;height:17px;stroke-width:1.8}
-.tok-preset-wrap{display:flex;gap:8px;overflow-x:auto;padding:0 16px 6px;scrollbar-width:none}
+.tok-search-wrap{padding:0 0 2px}
+.tok-search-field{margin:0 16px 8px}
+.tok-preset-wrap{display:flex;gap:8px;overflow-x:auto;padding:0 16px 6px;scrollbar-width:none;min-height:34px;align-items:center}
 .tok-preset-wrap::-webkit-scrollbar{display:none}
 .tok-preset{flex:none;padding:8px 12px;border-radius:999px;font-size:13px;white-space:nowrap;background:color-mix(in srgb,var(--pc,#0a84ff) 20%,transparent);box-shadow:inset 0 0 0 .5px color-mix(in srgb,var(--pc,#0a84ff) 50%,transparent)}
 .tok-preset:active{transform:scale(.94)}
+.tok-preset-custom{background:var(--fill);color:var(--tint);font-weight:600}
+.tok-preset-hint{font-size:12px;color:var(--tertiary);white-space:nowrap}
+.tok-icon-btn{border:0;background:none;padding:0;cursor:pointer}
+.tok-save-top{color:var(--tint)!important;font-weight:600}
 .tok-form-actions{display:flex;gap:12px;align-items:center;padding:20px 16px 30px}
 .btn-text{padding:10px 4px;font-size:15px;color:var(--tint)}
 .btn-text.destructive{color:var(--red)}
