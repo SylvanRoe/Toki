@@ -63,22 +63,35 @@
     if (d < 7 * DAY) return { text: `${Math.ceil(d / DAY)} 天后到期`, cls: 'soon' };
     return { text: new Date(t.expiresAt).toLocaleDateString('zh-CN'), cls: '' };
   }
-  function favicon(t) {
+  function favicon(t, size = '') {
+    // 与账号表单一致：自定义图标优先，其次本地预设图标 / 多源 favicon / 品牌色字母兜底
+    const custom = ctx?.customIcon?.(t);
+    if (custom) return `<span class="icon fav full ${size}"><img alt="" loading="lazy" decoding="async" width="64" height="64" src="${esc(custom)}"></span>`;
+    if (ctx?.favIcon) return ctx.favIcon({ ...t, name: t.name || 'T' }, size);
+    // ctx 未注入图标能力时的兜底
     const domain = String(t.domain || '').trim();
     const initial = esc((t.name || 'T').slice(0, 1).toUpperCase());
-    // 手动添加的图标（data URL）优先；其余走品牌色 + 域名 favicon
-    if (typeof t.icon === 'string' && /^data:image\//.test(t.icon))
-      return `<span class="tok-fav" style="--pc:${esc(t.color || '#0a84ff')}"><img src="${esc(t.icon)}" alt=""></span>`;
     if (!domain) return `<span class="tok-fav" style="--pc:${esc(t.color || '#0a84ff')}">${initial}</span>`;
     return `<span class="tok-fav" style="--pc:${esc(t.color || '#0a84ff')}"><img src="https://www.google.com/s2/favicons?sz=64&domain=${encodeURIComponent(domain)}" alt="" onerror="this.style.display='none';this.nextSibling&&(this.nextSibling.style.display='grid')"><b style="display:none">${initial}</b></span>`;
   }
   function byPreset(name) { return TOKEN_PRESETS.find(p => p[0].toLowerCase() === String(name || '').toLowerCase()); }
-  // 所有网站账号（用于「关联账号」选择），按名称排序
+  // 所有网站账号，按名称排序
   function allAccounts() {
     const s = getState();
     return Array.isArray(s?.accounts) ? s.accounts.slice().sort((a, b) => zh(a.name, b.name)) : [];
   }
-  function accountName(id) { return allAccounts().find(a => a.id === id)?.name || ''; }
+  function accountName(id) { const a = allAccounts().find(x => x.id === id); return a ? a.name + (a.handle ? ' · ' + a.handle : '') : ''; }
+  const normKey = s => { const d = ctx?.cleanDomain?.(s) || String(s || '').trim().toLowerCase(); return d.replace(/^www\./, ''); };
+  // 把账号按「平台」分组：同一域名/名称下的多个账号归到一组（如 3 个 GitHub 账号）
+  function accountGroups() {
+    const groups = new Map();
+    for (const a of allAccounts()) {
+      const key = normKey(a.domain || a.name);
+      if (!groups.has(key)) groups.set(key, { key, name: a.name, domain: a.domain || '', accounts: [] });
+      groups.get(key).accounts.push(a);
+    }
+    return [...groups.values()].sort((x, y) => zh(x.name, y.name));
+  }
 
   function renderTokens() {
     const root = $('#tokenList');
@@ -133,61 +146,75 @@
     })();
     ui.tokenIcon = t.icon || '';
     ui.tokenColor = t.color || '#0a84ff';
-    const accounts = allAccounts();
     const catOptions = CAT_SUGGESTIONS.map(c => `<option value="${esc(c)}"></option>`).join('');
-    const accOptions = accounts.map(a => `<option value="${esc(a.id)}" ${a.id === t.accountId ? 'selected' : ''}>${esc(a.name)}${a.handle ? ' · ' + esc(a.handle) : ''}</option>`).join('');
+    const linkedName = t.accountId ? accountName(t.accountId) : '';
     const html = `<div class="sheet-bar"><button data-close>取消</button><span class="t">${existing ? '编辑密钥' : '添加密钥'}</span><button id="tokSaveTop" class="tok-save-top">保存</button></div>
       <input type="file" id="tokIconFile" accept="image/*" hidden>
       <div class="sheet-body">
-      <div class="form-hero"><button class="form-hero-icon tok-icon-btn" id="tokIconBtn" aria-label="更换图标" title="点击设置图标">${favicon({ name: t.name || 'T', domain: t.domain, color: t.color, icon: ui.tokenIcon })}</button><h2>${existing ? '编辑密钥' : '添加密钥'}</h2><p>点图标可手动设置 logo；密钥明文默认打码，复制不会写入日志</p></div>
-      <div class="sec-title">搜索平台</div>
-      <div class="tok-search-wrap">
-        <div class="spot-field tok-search-field"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="6.5"/><path d="m20 20-4-4"/></svg><input id="tokPlatformQ" placeholder="搜索平台名，或直接输入名字" autocomplete="off" enterkeyhint="search"></div>
-        <div class="tok-preset-wrap" id="tokPresets"></div>
+      <div class="form-hero" id="tokHero"></div>
+      <div class="group">
+        <div class="field" id="tokNameField"><label>名称</label><input id="tokName" value="${esc(t.name)}" placeholder="OpenAI、GitHub PAT…" autocomplete="off"></div>
+        <div class="suggest" id="tokSuggest"></div>
+        <div class="field"><label>域名</label><input id="tokDomain" value="${esc(t.domain)}" placeholder="选填，用来显示图标" autocomplete="off"></div>
       </div>
       <div class="sec-title">详细信息</div>
       <div class="group">
-        <div class="field"><label>名称</label><input id="tokName" value="${esc(t.name)}" placeholder="OpenAI / GitHub PAT" autocomplete="off"></div>
-        <div class="field"><label>域名</label><input id="tokDomain" value="${esc(t.domain)}" placeholder="openai.com" autocomplete="off"></div>
         <div class="field"><label>分类</label><input id="tokCategory" list="tokCatList" value="${esc(t.category || '')}" placeholder="手填分类，可自定义" autocomplete="off"><datalist id="tokCatList">${catOptions}</datalist></div>
         <div class="field"><label>密钥</label><input id="tokValue" type="password" value="${esc(t.value)}" placeholder="粘贴 Token / Key" autocomplete="off" spellcheck="false"></div>
         <div class="field"><label>到期日</label><input id="tokExpiry" type="date" value="${t.expiresAt ? new Date(t.expiresAt).toISOString().slice(0, 10) : ''}"></div>
-        <div class="field"><label>关联账号</label><select id="tokAccount"><option value="">不关联</option>${accOptions}</select></div>
-        <div class="field stack notes-field"><label>备注</label><textarea id="tokNotes" placeholder="用途、权限范围…" spellcheck="false">${esc(t.notes)}</textarea></div>
+        <button class="field link-field" id="tokAccountBtn"><label>关联账号</label><span class="link-val" id="tokAccountVal">${linkedName ? esc(linkedName) : '<em>未关联</em>'}</span><span class="link-chev">›</span></button>
+        <div class="acc-picker" id="accPicker" hidden></div>
+        <div class="field stack"><textarea id="tokNotes" placeholder="用途、权限范围…" spellcheck="false">${esc(t.notes)}</textarea></div>
       </div>
       <p class="hint">到期日只作为提醒，不会在本地或云端存储任何真实密钥以外的信息。</p>
       <div class="tok-form-actions"><button class="btn-filled" data-toksave="1">${existing ? '保存修改' : '添加密钥'}</button>${existing ? '<button class="btn-text destructive" data-tokdelete="' + esc(t.id) + '">删除</button>' : ''}</div>
     </div>`;
     ctx.openSheet(html, { kind: 'token', id: t.id });
     ui.sheetTokenId = existing ? t.id : null;
-    setTimeout(() => wireTokenForm(existing), 0);
+    ui.tokenAccountId = t.accountId || '';
+    setTimeout(() => wireTokenForm(t, existing), 0);
   }
 
-  // 平台预设的搜索/手添、图标上传、分类随名称联动
-  function wireTokenForm(existing) {
-    const drawPresets = () => {
-      const box = $('#tokPresets'); if (!box) return;
-      const q = ($('#tokPlatformQ')?.value || '').trim().toLowerCase();
-      const list = q ? TOKEN_PRESETS.filter(p => p[0].toLowerCase().includes(q) || p[1].includes(q)) : [];
-      const exact = q && TOKEN_PRESETS.some(p => p[0].toLowerCase() === q);
-      box.innerHTML = list.map(p => `<button type="button" class="tok-preset" data-tokpreset="${esc(p[0])}" style="--pc:${p[3]}">${esc(p[0])}</button>`).join('') +
-        (q && !exact ? `<button type="button" class="tok-preset tok-preset-custom" data-tokcustom="${esc(q)}"><span class="icon">＋</span> 用“${esc(q)}”</button>` : '') +
-        (!q ? `<span class="tok-preset-hint">输入名字搜索平台，或直接手填</span>` : '');
+  // 名称联想（复用账号表单的 suggest 交互）、默认 logo 跟随、图标手添、关联账号两级选择
+  function wireTokenForm(t, existing) {
+    const nameEl = $('#tokName'), domEl = $('#tokDomain'), suggest = $('#tokSuggest'), hero = $('#tokHero');
+    const paintHero = (nm, dom) => {
+      ui._paintHero = paintHero;
+      if (!hero) return;
+      const cur = { name: nm || 'T', domain: dom, color: ui.tokenColor, icon: ui.tokenIcon };
+      hero.innerHTML = `<button class="hero-icon" id="tokIconBtn" aria-label="更换图标">${favicon(cur, 'lg')}<i class="hero-edit">${ICON_EDIT}</i></button><b>${esc(nm || '新密钥')}</b>
+        <div class="icon-menu" id="tokIconMenu"><button data-tim="pick"><span>从相册选择</span></button>${ui.tokenIcon ? '<button data-tim="reset"><span>使用默认图标</span></button>' : ''}</div>`;
+      $('#tokIconBtn').onclick = e => { e.stopPropagation(); $('#tokIconMenu').classList.toggle('open'); };
+      $$('#tokIconMenu button').forEach(b => b.onclick = e => {
+        e.stopPropagation(); $('#tokIconMenu').classList.remove('open');
+        if (b.dataset.tim === 'pick') $('#tokIconFile').click(); else { ui.tokenIcon = ''; paintHero(nameEl?.value, domEl?.value); }
+      });
     };
-    const qEl = $('#tokPlatformQ');
-    if (qEl) qEl.addEventListener('input', drawPresets);
-    drawPresets();
-    const iconBtn = $('#tokIconBtn'), file = $('#tokIconFile');
-    if (iconBtn && file) {
-      iconBtn.onclick = () => file.click();
-      file.onchange = async e => {
-        const f = e.target.files[0]; e.target.value = ''; if (!f) return;
-        try {
-          const v = await (ctx.makeIcon ? ctx.makeIcon(f) : fileToDataUrl(f));
-          ui.tokenIcon = v; iconBtn.innerHTML = favicon({ name: $('#tokName')?.value || 'T', domain: $('#tokDomain')?.value, color: '', icon: v });
-        } catch { toast('这张图片读不了，换一张试试'); }
-      };
-    }
+    // 名称输入联想平台预设
+    const drawSuggest = () => {
+      if (!suggest) return;
+      const q = (nameEl?.value || '').trim().toLowerCase();
+      const ALL = TOKEN_PRESETS;
+      const exact = ALL.find(p => p[0].toLowerCase() === q);
+      if (exact && !existing) { /* 精确匹配不强制覆盖，避免打断输入 */ }
+      const list = q && !exact ? ALL.filter(p => p[0].toLowerCase().includes(q) || p[1].includes(q)).slice(0, 8) : [];
+      suggest.innerHTML = list.map(p => `<button data-tokpreset="${esc(p[0])}">${favicon({ name: p[0], domain: p[1], color: p[3] })}${esc(p[0])}</button>`).join('');
+      $$('#tokSuggest button').forEach(b => b.onclick = () => applyPreset(b.dataset.tokpreset));
+    };
+    nameEl?.addEventListener('input', () => { drawSuggest(); paintHero(nameEl.value, domEl?.value); });
+    domEl?.addEventListener('input', () => paintHero(nameEl?.value, domEl.value));
+    paintHero(nameEl?.value, domEl?.value);
+    drawSuggest();
+    // 图标上传
+    const file = $('#tokIconFile');
+    if (file) file.onchange = async e => {
+      const f = e.target.files[0]; e.target.value = ''; if (!f) return;
+      try { ui.tokenIcon = await (ctx.makeIcon ? ctx.makeIcon(f) : fileToDataUrl(f)); paintHero(nameEl?.value, domEl?.value); }
+      catch { toast('这张图片读不了，换一张试试'); }
+    };
+    // 点击外部关闭图标菜单
+    document.addEventListener('click', function off(e) { const m = $('#tokIconMenu'); if (!m) return document.removeEventListener('click', off, true); if (!e.target.closest('#tokIconMenu,#tokIconBtn')) m.classList.remove('open'); }, true);
+    wireAccountPicker();
   }
   function fileToDataUrl(f) {
     return new Promise((ok, no) => { const r = new FileReader(); r.onload = () => ok(r.result); r.onerror = no; r.readAsDataURL(f); });
@@ -197,11 +224,38 @@
     const p = byPreset(name); if (!p) return;
     const set = (id, v) => { const el = $('#' + id); if (el) el.value = v; };
     set('tokName', p[0]); set('tokDomain', p[1]);
-    // 分类仍允许手填：仅当当前为空或是预设分类时才跟随平台建议
     const cat = $('#tokCategory'); if (cat && (!cat.value || CAT_SUGGESTIONS.includes(cat.value))) cat.value = p[2];
     ui.tokenColor = p[3];
-    const iconBtn = $('#tokIconBtn');
-    if (iconBtn && !ui.tokenIcon) iconBtn.innerHTML = favicon({ name: p[0], domain: p[1], color: p[3] });
+    const suggest = $('#tokSuggest'); if (suggest) suggest.innerHTML = '';
+    // 重绘 hero（联想点击后名称/域名变了）
+    if (ui._paintHero) ui._paintHero($('#tokName')?.value, $('#tokDomain')?.value);
+  }
+
+  // 两级「关联账号」选择：先平台，再该平台下的具体账号（表单内内联展开，不丢失其它输入）
+  function wireAccountPicker() {
+    const btn = $('#tokAccountBtn'), box = $('#accPicker'); if (!btn || !box) return;
+    const groups = accountGroups();
+    let step = 'group';
+    const setVal = () => { const val = $('#tokAccountVal'); if (val) val.innerHTML = ui.tokenAccountId ? esc(accountName(ui.tokenAccountId)) : '<em>未关联</em>'; };
+    const close = () => { box.hidden = true; box.innerHTML = ''; btn.classList.remove('open'); };
+    const draw = () => {
+      box.hidden = false;
+      btn.classList.add('open');
+      if (step === 'group') {
+        box.innerHTML = `<div class="acc-pick-hint">先选平台</div><div class="acc-grid">${groups.map(g => `<button class="acc-tile" data-accgroup="${esc(g.key)}">${favicon({ name: g.name, domain: g.domain })}<span>${esc(g.name)}</span><small>${g.accounts.length} 个账号</small></button>`).join('')}</div>`;
+        $$('#accPicker [data-accgroup]').forEach(b => b.onclick = () => { const g = groups.find(x => x.key === b.dataset.accgroup); step = 'account'; ui.accPickGroup = g; draw(); });
+      } else {
+        const g = ui.accPickGroup;
+        box.innerHTML = `<div class="acc-pick-hint"><button class="acc-back" id="accBack">‹ ${esc(g.name)}</button><span>选具体账号</span></div><div class="acc-list">${g.accounts.map(a => `<button class="acc-acc ${a.id === ui.tokenAccountId ? 'on' : ''}" data-accid="${esc(a.id)}">${favicon(a)}<span class="acc-acc-main"><b>${esc(a.name)}</b>${a.handle ? `<small>${esc(a.handle)}</small>` : ''}</span><span class="tick">${a.id === ui.tokenAccountId ? '✓' : ''}</span></button>`).join('')}</div>`;
+        $('#accBack').onclick = () => { step = 'group'; draw(); };
+        $$('#accPicker [data-accid]').forEach(b => b.onclick = () => {
+          ui.tokenAccountId = b.dataset.accid === ui.tokenAccountId ? '' : b.dataset.accid;
+          setVal();
+          $$('#accPicker .acc-acc').forEach(x => { const on = x.dataset.accid === ui.tokenAccountId; x.classList.toggle('on', on); x.querySelector('.tick').textContent = on ? '✓' : ''; });
+        });
+      }
+    };
+    btn.onclick = () => { if (!groups.length) { toast('先在「网站与 App」里添加一个账号'); return; } if (!box.hidden) { close(); return; } step = 'group'; draw(); };
   }
   function readTokenForm() {
     const name = $('#tokName')?.value.trim();
@@ -214,7 +268,7 @@
       color: ui.tokenColor || byPreset(name)?.[3] || '#0a84ff', value,
       expiresAt: exp ? new Date(exp + 'T23:59:59').getTime() : 0,
       notes: $('#tokNotes')?.value.trim() || '',
-      accountId: $('#tokAccount')?.value || '',
+      accountId: ui.tokenAccountId || '',
       icon: ui.tokenIcon || '',
       createdAt: Date.now(), updatedAt: Date.now(),
     };
@@ -234,7 +288,7 @@
   }
 
   function handleClick(e) {
-    const t = e.target.closest('[data-tokcat],[data-new="token"],[data-tokcopy],[data-toksee],[data-tokedit],[data-tokpreset],[data-tokcustom],[data-toksave],#tokSaveTop,[data-tokdelete]');
+    const t = e.target.closest('[data-tokcat],[data-new="token"],[data-tokcopy],[data-toksee],[data-tokedit],[data-toksave],#tokSaveTop,[data-tokdelete]');
     if (!t) return false;
     const d = t.dataset;
     if (d.tokcat !== undefined) { ui.cat = d.tokcat; renderTokens(); return true; }
@@ -251,14 +305,6 @@
     if (d.tokedit) {
       const token = list().find(x => x.id === d.tokedit);
       if (token) tokenForm(token);
-      return true;
-    }
-    if (d.tokpreset) { applyPreset(d.tokpreset); return true; }
-    if (d.tokcustom !== undefined) {
-      // 手填平台：填入名称，若有同名预设则带上域名/分类/颜色，否则纯手填
-      const nm = $('#tokName'); if (nm) nm.value = d.tokcustom;
-      applyPreset(d.tokcustom);
-      const q = $('#tokPlatformQ'); if (q) { q.value = d.tokcustom; }
       return true;
     }
     if (d.toksave !== undefined || t.id === 'tokSaveTop') { saveToken(); return true; }
