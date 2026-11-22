@@ -845,7 +845,7 @@
         <div class="sec-title">分类</div>
         <div class="group"><div class="field"><label>分类</label><input id="aCategory" list="aCatList" value="${esc(cat || '')}" placeholder="手填分类，可自定义" autocomplete="off"><datalist id="aCatList">${CATS.map(c => `<option value="${esc(c)}"></option>`).join('')}</datalist></div></div>
         <div class="sec-title">备注</div>
-        <div class="group"><div class="field stack notes-field"><label>备注</label><textarea id="aNotes" placeholder="是否开了两步验证、用户名、会员到期日">${esc(a.notes || '')}</textarea></div></div>
+        <div class="group"><div class="field stack"><textarea id="aNotes" placeholder="是否开了两步验证、用户名、会员到期日">${esc(a.notes || '')}</textarea></div></div>
         <p class="hint">不要在这里填写密码。</p>
       </div>`, { kind: 'form' });
     setTimeout(() => {
@@ -1685,7 +1685,7 @@
   }
   if (!state.identities.some(i => i.type === ui.kind)) { const t = state.identities.find(i => KINDS.includes(i.type)); if (t) ui.kind = t.type; }
 
-  window.TokiTokens?.install({ getState: () => state, save, render, toast, openSheet, closeSheet, confirmSheet, refreshSheet, makeIcon });
+  window.TokiTokens?.install({ getState: () => state, save, render, toast, openSheet, closeSheet, confirmSheet, refreshSheet, makeIcon, favIcon, brand, localIcon, favSources, PRESETS, cleanDomain, customIcon });
   paintTheme(); render(); Sync.init(); Sync.listeners.forEach(f => f());
   const first = cur();
   $('#glow').style.setProperty('--accent', first ? first.color : '#3a3a3c'); glowColor = first ? first.color : '#3a3a3c';

@@ -832,3 +832,33 @@ html[data-theme=light] .tok-reel{background:#fff;box-shadow:0 1px 2px rgba(0,0,0
 html[data-theme=light] .tok-blur{opacity:.1}
 html[data-theme=light] .tok-cat{background:#f2f2f7}
 html[data-theme=light] .tok-actions button{background:#f2f2f7;color:#3a3a3c}
+/* 关联账号：跳转行 + 内联两级选择 */
+.link-field{width:100%;background:none;border:0;color:inherit;cursor:pointer;text-align:left}
+.link-field:active{opacity:.6}
+.link-field label{width:64px;flex:none;font-size:16px}
+.link-val{flex:1;min-width:0;font-size:17px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.link-val em{color:var(--tertiary);font-style:normal}
+.link-chev{color:var(--tertiary);font-size:22px;line-height:1;flex:none;padding-right:2px}
+.link-field.open .link-chev{transform:rotate(90deg)}
+.acc-picker{padding:12px 16px 16px;background:var(--fill);margin:0 12px 0;border-radius:14px}
+.acc-picker[hidden]{display:none}
+.acc-pick-hint{display:flex;align-items:center;gap:10px;font-size:13px;color:var(--secondary);font-weight:600;margin:2px 0 12px}
+.acc-back{background:none;border:0;color:var(--tint);font-size:14px;padding:0;font-weight:600}
+.acc-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(88px,1fr));gap:10px}
+.acc-tile{display:flex;flex-direction:column;align-items:center;gap:6px;padding:12px 6px;border-radius:12px;background:rgba(255,255,255,.06);font-size:13px;text-align:center}
+.acc-tile:active{transform:scale(.95);background:rgba(255,255,255,.12)}
+.acc-tile .icon{width:38px;height:38px;border-radius:10px}
+.acc-tile small{font-size:11px;color:var(--tertiary)}
+.acc-list{display:flex;flex-direction:column;gap:2px}
+.acc-acc{display:flex;align-items:center;gap:10px;padding:9px 8px;border-radius:10px;text-align:left;background:none;border:0;color:inherit}
+.acc-acc.on{background:rgba(255,255,255,.08)}
+.acc-acc:active{opacity:.6}
+.acc-acc .icon{width:32px;height:32px;border-radius:8px;flex:none}
+.acc-acc-main{flex:1;min-width:0;display:flex;flex-direction:column;gap:1px}
+.acc-acc-main b{font-size:15px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.acc-acc-main small{font-size:12px;color:var(--tertiary)}
+.acc-acc .tick{color:var(--tint);font-weight:700;flex:none;width:16px;text-align:center}
+/* token 表单 hero 用通用 hero-icon，图标尺寸对齐账号 */
+#tokHero .hero-icon .icon{width:72px;height:72px;border-radius:17px}
+html[data-theme=light] .acc-tile{background:#fff}
+html[data-theme=light] .acc-acc.on{background:rgba(0,0,0,.05)}
