@@ -71,10 +71,19 @@ cd web && python3 -m http.server 8080
 ```
 浏览器打开 `http://localhost:8080`。iPhone Safari「添加到主屏幕」即可当 App 用。
 
-### Scripting App
-1. 下载仓库里的 `Toki.scripting`
-2. 用 Scripting App 导入（或点导入链接）
-3. 打开 Toki，即可看到四页界面；在桌面添加 Toki 小组件
+### Scripting App（完整四页应用）
+
+> ⚠️ **Toki 主脚本就是一个完整 App，不是一个只有小组件的脚本包。** 导入后请**点击脚本列表里的「Toki」名称来运行**，会打开卡包 / 网站 / Tokens / 关系图四个页面（可增删改）。桌面小组件是**另外单独添加**的只读摘要，两者不是一回事。
+
+1. 下载仓库里的 `Toki.scripting`，用 Scripting App 导入（或点下面的导入链接）
+2. **在 Scripting 的脚本列表里点「Toki」运行** → 打开完整四页 App
+3. App 右上角齿轮：载入示例数据 / 导入导出 / 隐私模式 / 主题 / 清空
+4. 想要桌面摘要：再单独把 **Toki 小组件**添加到主屏幕（小组件只显示脱敏摘要，不能编辑）
+
+```text
+脚本「Toki」→ 完整可编辑 App（卡包/网站/Tokens/关系图）
+桌面小组件 Toki → 只读摘要（临期数量 + 密钥名称，打码）
+```
 
 ## 网页 → Scripting 数据互通
 

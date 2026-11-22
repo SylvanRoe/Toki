@@ -23,7 +23,7 @@ type Modal =
   | { kind: "settings" }
   | null
 
-function App() {
+export function App() {
   const [state, setState] = useState<TokiState>(() => loadState())
   const [settings, setSettings] = useState<TokiSettings>(() => loadSettings())
   const [tab, setTab] = useState(0)
@@ -207,6 +207,7 @@ function App() {
   )
 }
 
-// Navigation.present keeps the UI alive; Script.exit() releases the run entry.
-Navigation.present(<App />)
-Script.exit()
+// Navigation.present() resolves only AFTER the UI is dismissed.
+// Never call Script.exit() synchronously here — that would close the app instantly
+// and leave only the widget (which runs in a separate, persistent context).
+Navigation.present(<App />).then(() => Script.exit()).catch(() => Script.exit())
