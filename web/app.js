@@ -189,7 +189,8 @@
   const isESim = i => i.type === 'phone' && i.esim === true;
   const idById = id => state.identities.find(i => i.id === id);
   const accById = id => state.accounts.find(a => a.id === id);
-  const accountsOf = id => state.accounts.filter(a => a.identityIds.includes(id)).sort((a, b) => zh(a.name, b.name));
+  const identityIdsOf = a => Array.isArray(a?.identityIds) ? [...new Set(a.identityIds.filter(id => typeof id === 'string' && id))] : [];
+  const accountsOf = id => state.accounts.filter(a => identityIdsOf(a).includes(id)).sort((a, b) => zh(a.name, b.name));
   // the email / phone a login card is bound to; a dangling or odd reference counts as none
   const viaOf = i => { if (i.type !== 'login' || !i.via) return null; const v = idById(i.via); return v && (v.type === 'email' || v.type === 'phone') ? v : null; };
   const boundTo = id => state.identities.filter(i => i.type === 'login' && i.via === id && viaOf(i));
@@ -206,19 +207,38 @@
   const cleanDomain = d => (d || '').trim().toLowerCase().replace(/^https?:\/\//, '').replace(/^www\./, '').split(/[/?#]/)[0];
   // the account's own icon (uploaded, or from the App Store): a small square data: URL, synced with the data
   const customIcon = a => typeof a?.icon === 'string' && a.icon.length < 400000 && /^data:image\/(png|jpeg);base64,[A-Za-z0-9+/]+=*$/.test(a.icon) ? a.icon : null;
+  const normPlatformName = value => String(value || '').normalize('NFKC').trim().replace(/\s+/g, ' ').toLowerCase();
+  // Prefer the most-specific matching domain. This keeps mail.qq.com separate from qq.com,
+  // gemini.google.com separate from google.com, etc. A name fallback is only safe without a domain.
+  function sitePreset(a = {}) {
+    const d = cleanDomain(a.domain);
+    if (d) {
+      const matches = PRESETS.filter(p => { const pd = cleanDomain(p[1]); return pd && (d === pd || d.endsWith('.' + pd)); });
+      if (matches.length) return matches.sort((x, y) => cleanDomain(y[1]).length - cleanDomain(x[1]).length)[0];
+      return null;
+    }
+    const n = normPlatformName(a.name);
+    return n ? PRESETS.find(p => normPlatformName(p[0]) === n) || null : null;
+  }
   // bundled 192px icons for every preset, so common apps are sharp and load from this site
   const localIcon = a => {
-    const d = cleanDomain(a.domain), n = (a.name || '').toLowerCase();
-    const p = PRESETS.find(p => (d && (d === p[1] || d.endsWith('.' + p[1]))) || (!d && p[0].toLowerCase() === n));
+    const p = sitePreset(a);
     return p ? `icons/${p[1]}.png` : null;
   };
   const favSources = d => { d = cleanDomain(d); return d ? [`https://favicon.im/${d}?larger=true`, `https://${d}/apple-touch-icon.png`, `https://${d}/favicon.ico`, `https://www.google.com/s2/favicons?domain=${d}&sz=128`] : []; };
   function brand(a) {
-    const d = cleanDomain(a.domain), n = (a.name || '').toLowerCase();
-    const p = PRESETS.find(p => (d && (d === p[1] || d.endsWith('.' + p[1]))) || p[0].toLowerCase() === n);
+    const d = cleanDomain(a.domain), n = normPlatformName(a.name), p = sitePreset(a);
     if (p) return p[3];
     let h = 0; for (const ch of (d || n || '?')) h = (h * 31 + ch.charCodeAt(0)) >>> 0;
     return `hsl(${h % 360} 62% 48%)`;
+  }
+  // Relationship-map grouping: concrete accounts remain separate records, while the middle
+  // column shows one visual node per website/App. Known presets share their canonical domain.
+  function accountPlatform(a) {
+    const d = cleanDomain(a.domain), n = normPlatformName(a.name), p = sitePreset(a);
+    if (p) return { key: `preset:${cleanDomain(p[1])}`, name: p[0], domain: cleanDomain(p[1]) };
+    if (d) return { key: `domain:${d}`, name: a.name || d, domain: d };
+    return { key: `name:${n || a.id}`, name: a.name || '未命名平台', domain: '' };
   }
 
   // ---------- icons ----------
@@ -473,7 +493,7 @@
   function reel(a, meta = '') {
     return `<button class="reel" data-account="${a.id}">
       ${poster([a], 1, 'blur')}${favIcon(a)}
-      <span class="reel-main"><span class="reel-title">${esc(a.name)}${handle(a)}</span><span class="caps">${caps(a.identityIds) || '<span class="cap dim">未关联</span>'}</span></span>
+      <span class="reel-main"><span class="reel-title">${esc(a.name)}${handle(a)}</span><span class="caps">${caps(identityIdsOf(a)) || '<span class="cap dim">未关联</span>'}</span></span>
       ${meta ? `<span class="reel-meta">${meta}</span>` : ICON.chev}
     </button>`;
   }
@@ -672,7 +692,7 @@
 
   function showAccount(id) {
     const a = accById(id); if (!a) return;
-    const ids = a.identityIds.map(idById).filter(Boolean);
+    const ids = identityIdsOf(a).map(idById).filter(Boolean);
     const d = cleanDomain(a.domain);
     openSheet(`${closeX}
       <div class="sheet-body">
@@ -692,6 +712,25 @@
         ${a.notes ? `<div class="sec-title">备注</div><div class="notes">${esc(a.notes)}</div>` : ''}
         <p class="hint" style="margin-top:16px">添加于 ${new Date(a.createdAt || Date.now()).toLocaleDateString('zh-CN', { year: 'numeric', month: 'long', day: 'numeric' })}</p>
       </div>`, { kind: 'account', id });
+  }
+
+  function showPlatformAccounts(accounts, name) {
+    const list = accounts.map(a => typeof a === 'string' ? accById(a) : a).filter(Boolean);
+    if (!list.length) return;
+    if (list.length === 1) return showAccount(list[0].id);
+    const rep = list[0];
+    openSheet(`${closeX}
+      <div class="sheet-body">
+        <div class="cine">
+          ${poster(list, 4, 'backdrop')}
+          ${favIcon(rep, 'lg')}
+          <h2>${esc(name || rep.name)}</h2>
+          <p class="acc-handle">${list.length} 个具体账号</p>
+        </div>
+        <div class="sec-title">选择具体账号</div>
+        <div class="cat-list" style="padding:0">${list.map(a => reel(a)).join('')}</div>
+        <p class="hint" style="margin-top:16px">关系图按网站或 App 合并显示；这里仍保留每个邮箱注册的具体账号。</p>
+      </div>`, { kind: 'account-platform', ids: list.map(a => a.id) });
   }
 
   // ---------- forms ----------
@@ -836,7 +875,7 @@
   function accountForm(existing, presetId, presetName = '') {
     if (!state.identities.length) { identityForm(); toast('先添加一个邮箱或手机号'); return; }
     const a = existing || { name: presetName, domain: '', category: '其他', identityIds: presetId ? [presetId] : [], notes: '' };
-    const sel = new Set(a.identityIds);
+    const sel = new Set(identityIdsOf(a));
     let cat = a.category, icon = customIcon(a) || '', iconSeq = 0;
     openSheet(`${bar('取消', existing ? '编辑' : '新网站或 App', existing ? '保存' : '添加', 'id="saveAccount"')}
       <div class="sheet-body form">
@@ -1300,7 +1339,7 @@
     if (d.delIdentity) {
       const i = idById(d.delIdentity), n = accountsOf(i.id).length;
       return confirmSheet(`删除 ${display(i)}？`, n ? `它会从 ${n} 个网站与 App 的记录里移除，这些网站本身会保留。` : '删除后几秒内可以撤销。', '删除', () => {
-        snap(); state.identities = state.identities.filter(x => x.id !== i.id); state.accounts.forEach(a => a.identityIds = a.identityIds.filter(x => x !== i.id)); state.identities.forEach(x => { if (x.via === i.id) delete x.via; }); save(); render(); undoToast('已删除');
+        snap(); state.identities = state.identities.filter(x => x.id !== i.id); state.accounts.forEach(a => a.identityIds = identityIdsOf(a).filter(x => x !== i.id)); state.identities.forEach(x => { if (x.via === i.id) delete x.via; }); save(); render(); undoToast('已删除');
       });
     }
     if (d.delAccount) {
@@ -1361,32 +1400,71 @@
 
   // ---------- relationship map: identities on the left, apps on the right, threads between ----------
   const Graph = (() => {
-    let sel = null, running = false, drawn = false, built = '', pre = 0;
+    let sel = null, running = false, drawn = false, built = '', pre = 0, groupsByKey = new Map(), tokenLinksByKey = new Map();
     const ROW = 64, TOKEN_STEP = 48;
     function layout() {
       const TR = t => KINDS.indexOf(t);
-      const ids = state.identities.filter(i => TR(i.type) >= 0).sort((p, q) => TR(p.type) - TR(q.type));
-      const idx = id => ids.findIndex(i => i.id === id);
-      const first = a => { const ks = a.identityIds.map(idx).filter(k => k >= 0); return ks.length ? Math.min(...ks) : 1e3; };
-      const apps = state.accounts.slice().sort((a, b) => first(a) - first(b) || b.identityIds.length - a.identityIds.length || zh(a.name, b.name));
-      // 第三列逐条显示密钥。一个账号有多条密钥时扩大它的行，并从账号节点分别连出。
-      const toksByAcc = Object.create(null), loose = [];
-      apps.forEach(a => toksByAcc[a.id] = []);
-      (state.tokens || []).forEach(t => { if (t.accountId && Object.prototype.hasOwnProperty.call(toksByAcc, t.accountId)) toksByAcc[t.accountId].push(t); else loose.push(t); });
-      Object.values(toksByAcc).forEach(list => list.sort((a, b) => zh(a.name, b.name)));
-      loose.sort((a, b) => zh(a.name, b.name));
-      const ay = {}, tokenYs = {}; let cursor = 0;
-      apps.forEach(a => {
-        const count = toksByAcc[a.id].length, block = Math.max(ROW, count * TOKEN_STEP);
-        ay[a.id] = cursor + block / 2;
-        tokenYs[a.id] = toksByAcc[a.id].map((_, k) => cursor + (block - (count - 1) * TOKEN_STEP) / 2 + k * TOKEN_STEP);
+      const identities = Array.isArray(state.identities) ? state.identities : [];
+      const accounts = Array.isArray(state.accounts) ? state.accounts.filter(a => a && typeof a === 'object') : [];
+      const ids = identities.filter(i => i && TR(i.type) >= 0).sort((p, q) => TR(p.type) - TR(q.type));
+      const rank = new Map(ids.map((i, k) => [i.id, k]));
+      const idx = id => rank.has(id) ? rank.get(id) : 1e3;
+      // Duplicate ids are malformed data; matching accById's first-record rule is deterministic.
+      const accountById = new Map();
+      for (const account of accounts) if (account.id && !accountById.has(account.id)) accountById.set(account.id, account);
+      const accountToGroup = new Map(), grouped = new Map();
+
+      // Concrete accounts stay separate in state, but the middle column has one node per platform.
+      for (const account of accounts) {
+        const meta = accountPlatform(account);
+        let group = grouped.get(meta.key);
+        if (!group) {
+          group = { ...meta, rep: account, visual: account, accounts: [], identityIds: [], tokens: [] };
+          grouped.set(meta.key, group);
+        }
+        group.accounts.push(account); accountToGroup.set(account, group);
+      }
+      for (const group of grouped.values()) {
+        const seenIds = new Set();
+        group.accounts.sort((a, b) => zh(String(a.handle || a.name || ''), String(b.handle || b.name || '')));
+        for (const account of group.accounts) for (const id of identityIdsOf(account)) {
+          if (rank.has(id) && !seenIds.has(id)) { seenIds.add(id); group.identityIds.push(id); }
+        }
+        group.identityIds.sort((a, b) => idx(a) - idx(b));
+        group.rep = group.accounts.find(customIcon) || group.accounts[0];
+        group.visual = { ...group.rep, name: group.name };
+        group.visual['domain'] = group.domain || group.rep.domain || '';
+      }
+
+      // Only keys linked to an existing concrete account participate in the relationship map.
+      for (const token of (Array.isArray(state.tokens) ? state.tokens : [])) {
+        if (!token || typeof token !== 'object' || !token.accountId) continue;
+        const account = accountById.get(token.accountId), group = account && accountToGroup.get(account);
+        if (!account || !group) continue;
+        const tokenIdentities = identityIdsOf(account).map(idById).filter(Boolean);
+        group.tokens.push({ token, account, identities: tokenIdentities, identity: tokenIdentities[0] || null, color: tokenIdentities[0]?.color || token.color || brand(group.visual) });
+      }
+      const first = group => group.identityIds.length ? Math.min(...group.identityIds.map(idx)) : 1e3;
+      const groups = [...grouped.values()].sort((a, b) => first(a) - first(b) || b.identityIds.length - a.identityIds.length || zh(a.name, b.name));
+      groups.forEach(group => group.tokens.sort((a, b) => idx(a.identity?.id) - idx(b.identity?.id) || group.accounts.indexOf(a.account) - group.accounts.indexOf(b.account) || zh(String(a.token.name || ''), String(b.token.name || ''))));
+      groupsByKey = new Map(groups.map(group => [group.key, group]));
+      tokenLinksByKey = new Map();
+      let linkIndex = 0;
+      for (const group of groups) for (const item of group.tokens) { item.linkKey = String(linkIndex++); tokenLinksByKey.set(item.linkKey, item); }
+
+      const gy = {}, tokenYs = {}; let cursor = 0;
+      for (const group of groups) {
+        const count = group.tokens.length, block = Math.max(ROW, count * TOKEN_STEP);
+        gy[group.key] = cursor + block / 2;
+        tokenYs[group.key] = group.tokens.map((_, k) => cursor + (block - (count - 1) * TOKEN_STEP) / 2 + k * TOKEN_STEP);
         cursor += block;
-      });
-      const looseYs = loose.map((_, k) => cursor + TOKEN_STEP / 2 + k * TOKEN_STEP);
-      if (loose.length) cursor += Math.max(ROW, loose.length * TOKEN_STEP);
+      }
       const H = Math.max(cursor, ids.length * 78, 120);
-      // each identity card sits at the middle of its apps, then nudge apart so cards never overlap
-      let pos = ids.map(i => { const ys = accountsOf(i.id).map(a => ay[a.id]); return { i, y: ys.length ? ys.reduce((s, v) => s + v, 0) / ys.length : H }; });
+      // Each identity card sits at the middle of the unique platforms it connects to.
+      let pos = ids.map(i => {
+        const ys = groups.filter(group => group.identityIds.includes(i.id)).map(group => gy[group.key]);
+        return { i, y: ys.length ? ys.reduce((s, v) => s + v, 0) / ys.length : H };
+      });
       // emails first, then phone numbers, then login cards, with a small label above each group
       pos.sort((p, q) => TR(p.i.type) - TR(q.i.type) || p.y - q.y);
       const GAP = 78, half = 33, LBL = 30;
@@ -1396,49 +1474,56 @@
       const over = pos.length ? pos[pos.length - 1].y - (H - half) : 0;
       if (over > 0) for (let k = pos.length - 1; k >= 0; k--) { pos[k].y = Math.min(pos[k].y, k === pos.length - 1 ? H - half : pos[k + 1].y - GAP - (brk.has(k + 1) ? LBL : 0)); pos[k].y = Math.max(pos[k].y, minY[k]); }
       const H2 = Math.max(H, pos.length ? pos[pos.length - 1].y + half : 0);
-      return { apps, ay, pos, H: H2, brk, toksByAcc, tokenYs, loose, looseYs };
+      return { accounts, groups, gy, pos, H: H2, brk, tokenYs, linkedTokenCount: groups.reduce((n, group) => n + group.tokens.length, 0) };
     }
     function render() {
       const box = $('#mapBox'); if (!box) return;
-      const n = state.accounts.length, multi = state.accounts.filter(a => a.identityIds.length > 1).length;
-      const ntok = (state.tokens || []).length;
-      $('#graphSummary').textContent = n ? `${state.identities.length} 个身份，${n} 个网站与 App` + (ntok ? `，${ntok} 条密钥` : '') + (multi ? `，${multi} 个绑了不止一个` : '') : '';
-      if (!state.identities.length || !n) { box.innerHTML = `<div class="empty"><h3>还没有可以连线的</h3><p>添加一个邮箱或手机号，再给它记几个网站，这里就会连起来。</p><button class="btn-filled" data-new="${state.identities.length ? 'account' : 'identity'}">${state.identities.length ? '添加网站或 App' : '添加邮箱或手机号'}</button></div>`; return; }
-      const { apps, ay, pos, H, brk, toksByAcc, tokenYs, loose, looseYs } = layout();
+      const { accounts, groups, gy, pos, H, brk, tokenYs, linkedTokenCount } = layout();
+      const n = groups.length, identityCount = Array.isArray(state.identities) ? state.identities.length : 0;
+      const accountExtra = accounts.length !== n ? `，${accounts.length} 个具体账号` : '';
+      $('#graphSummary').textContent = n ? `${identityCount} 个身份，${n} 个平台${accountExtra}` + (linkedTokenCount ? `，${linkedTokenCount} 条已关联密钥` : '') : '';
+      if (!n) { box.innerHTML = `<div class="empty"><h3>还没有可以连线的</h3><p>添加一个邮箱或手机号，再给它记几个网站，这里就会连起来。</p><button class="btn-filled" data-new="${identityCount ? 'account' : 'identity'}">${identityCount ? '添加网站或 App' : '添加邮箱或手机号'}</button></div>`; return; }
       const W = box.clientWidth || 350, L = Math.min(124, Math.round(W * .29));
       const R = L + Math.max(46, Math.round(W * .12));
       const T = R + Math.max(92, Math.round(W * .27));
       const COL_GAP = W >= 560 ? 30 : 22;
       const AWW = Math.max(68, T - R - COL_GAP), TW = Math.max(0, W - T - 2);
       const paths = [], tpaths = [];
-      for (const p of pos) for (const a of accountsOf(p.i.id)) {
-        const y1 = p.y, y2 = ay[a.id], mx = (L + R) / 2;
-        paths.push(`<path data-i="${p.i.id}" data-a="${a.id}" style="--c:${p.i.color}" d="M${L} ${y1.toFixed(1)}C${mx} ${y1.toFixed(1)} ${mx} ${y2.toFixed(1)} ${R - 6} ${y2.toFixed(1)}"/>`);
+      for (const p of pos) for (const group of groups.filter(group => group.identityIds.includes(p.i.id))) {
+        const y1 = p.y, y2 = gy[group.key], mx = (L + R) / 2;
+        paths.push(`<path data-i="${p.i.id}" data-p="${esc(group.key)}" style="--c:${p.i.color}" d="M${L} ${y1.toFixed(1)}C${mx} ${y1.toFixed(1)} ${mx} ${y2.toFixed(1)} ${R - 6} ${y2.toFixed(1)}"/>`);
       }
-      for (const a of apps) {
-        const y1 = ay[a.id], x1 = R + AWW, x2 = T + 1, mx = (x1 + x2) / 2, c = brand(a);
-        toksByAcc[a.id].forEach((t, k) => {
-          const y2 = tokenYs[a.id][k];
-          tpaths.push(`<path class="tok-thread" data-a="${a.id}" data-t="${t.id}" style="--c:${c}" d="M${x1} ${y1.toFixed(1)}C${mx} ${y1.toFixed(1)} ${mx} ${y2.toFixed(1)} ${x2} ${y2.toFixed(1)}"/>`);
+      for (const group of groups) {
+        const y1 = gy[group.key], x1 = R + AWW, x2 = T + 1, mx = (x1 + x2) / 2;
+        group.tokens.forEach((item, k) => {
+          const y2 = tokenYs[group.key][k];
+          tpaths.push(`<path class="tok-thread" data-link="${item.linkKey}" data-a="${esc(item.account.id)}" data-p="${esc(group.key)}" data-t="${esc(item.token.id)}" style="--c:${esc(item.color)}" d="M${x1} ${y1.toFixed(1)}C${mx} ${y1.toFixed(1)} ${mx} ${y2.toFixed(1)} ${x2} ${y2.toFixed(1)}"/>`);
         });
       }
       const stateDot = t => { const d = Number(t.expiresAt) - Date.now(); return t.expiresAt ? (d < 0 ? 'expired' : d < 7 * 864e5 ? 'soon' : '') : ''; };
-      const tokenNode = (t, y, account = null) => {
-        const tokenState = stateDot(t), c = account ? brand(account) : (t.color || '#0a84ff');
-        const platform = t.platform || t.domain || (account ? account.name : '自定义平台');
-        return `<button class="mtok-group ${account ? '' : 'unlinked'} ${tokenState}" data-map-token="${esc(t.id)}" data-map-token-account="${esc(account?.id || '')}" style="top:${y - 21}px;left:${T}px;width:${TW}px;--c:${esc(c)}" aria-label="${esc(t.name || '未命名密钥')}">
-          <span class="mtg-key">${ICON.login}</span><span class="mtg-main"><span class="mtg-title"><i class="mtg-state ${tokenState}"></i>${esc(t.name || '未命名密钥')}</span><span class="mtg-names"><b><i class="${tokenState}"></i>${esc(platform)}</b></span></span><span class="link-chev">›</span></button>`;
+      const tokenNode = (item, y, group = null) => {
+        const token = item.token || item, account = item.account || null, identities = item.identities || [];
+        const tokenState = stateDot(token), color = item.color || token.color || '#0a84ff';
+        let owner;
+        if (account && group) {
+          const ordinal = group.accounts.indexOf(account) + 1;
+          const idOwner = identities.length > 1 ? `${identities[0].label || display(identities[0])} 等 ${identities.length} 个身份` : identities[0] ? (identities[0].label || display(identities[0])) : '';
+          const accountOwner = account.handle ? hd(account.handle) : group.accounts.length > 1 ? `账号 ${ordinal}` : '';
+          owner = [accountOwner, idOwner].filter(Boolean).join(' · ') || group.name;
+        } else owner = token.platform || token.domain || '未关联密钥';
+        const dots = identities.length ? `<span class="mtg-ids">${identities.map(i => `<i style="--c:${esc(i.color || color)}"></i>`).join('')}</span>` : '';
+        return `<button class="mtok-group ${account ? '' : 'unlinked'} ${tokenState}" data-map-token="${esc(token.id)}" data-map-token-account="${esc(account?.id || '')}" data-map-token-link="${esc(item.linkKey || '')}" style="top:${y - 21}px;left:${T}px;width:${TW}px;--c:${esc(color)}" aria-label="${esc(token.name || '未命名密钥')}">
+          <span class="mtg-key">${ICON.login}</span><span class="mtg-main"><span class="mtg-title"><i class="mtg-state ${tokenState}"></i>${esc(token.name || '未命名密钥')}</span><span class="mtg-names"><b>${dots}<span class="mtg-owner">${esc(owner)}</span></b></span></span><span class="link-chev">›</span></button>`;
       };
       box.style.height = H + 'px';
       box.innerHTML = `<svg class="threads" viewBox="0 0 ${W} ${H}" style="width:${W}px;height:${H}px" aria-hidden="true">${paths.join('')}${tpaths.join('')}</svg>
         <span class="mcol-head" style="left:0;width:${L}px">身份</span>
-        <span class="mcol-head" style="left:${R}px;width:${AWW}px">账号</span>
+        <span class="mcol-head" style="left:${R}px;width:${AWW}px">平台</span>
         <span class="mcol-head" style="left:${T}px;width:${TW}px">密钥</span>
         ${pos.map((p, k) => (k === 0 || brk.has(k)) ? `<span class="mgroup" style="top:${p.y - 31 - 24}px;width:${L}px">${p.i.type === 'phone' ? ICON.phone + '手机号' : p.i.type === 'login' ? ICON.login + '登录' : ICON.email + '邮箱'}</span>` : '').join('')}
-        ${pos.map(p => { const c = accountsOf(p.i.id).length; return `<button class="mcard" data-map-identity="${p.i.id}" style="top:${p.y - 31}px;width:${L}px;--c:${p.i.color};--g:${skin(p.i.color)}"><span class="mk">${idGlyph(p.i)}<b>${c}</b></span><span class="mv">${esc(p.i.label || display(p.i))}</span>${p.i.label ? `<span class="ms">${esc(display(p.i))}</span>` : ''}</button>`; }).join('')}
-        ${apps.map(a => `<button class="mapp ${a.identityIds.length ? '' : 'loose'}" data-account="${a.id}" style="top:${ay[a.id] - 27}px;left:${R}px;width:${AWW}px;--c:${brand(a)}">${favIcon(a)}<span class="mn">${esc(a.name)}${handle(a)}</span>${a.identityIds.length > 1 ? `<span class="mdots">${a.identityIds.map(idById).filter(Boolean).map(i => `<i style="--c:${i.color}"></i>`).join('')}</span>` : ''}</button>`).join('')}
-        ${apps.map(a => toksByAcc[a.id].map((t, k) => tokenNode(t, tokenYs[a.id][k], a)).join('')).join('')}
-        ${loose.map((t, k) => tokenNode(t, looseYs[k], null)).join('')}`;
+        ${pos.map(p => { const c = groups.filter(group => group.identityIds.includes(p.i.id)).length; return `<button class="mcard" data-map-identity="${p.i.id}" style="top:${p.y - 31}px;width:${L}px;--c:${p.i.color};--g:${skin(p.i.color)}"><span class="mk">${idGlyph(p.i)}<b>${c}</b></span><span class="mv">${esc(p.i.label || display(p.i))}</span>${p.i.label ? `<span class="ms">${esc(display(p.i))}</span>` : ''}</button>`; }).join('')}
+        ${groups.map(group => `<button class="mapp ${group.identityIds.length ? '' : 'loose'}" data-map-platform="${esc(group.key)}" style="top:${gy[group.key] - 27}px;left:${R}px;width:${AWW}px;--c:${brand(group.visual)}" aria-label="${esc(group.name)}，${group.accounts.length} 个账号">${favIcon(group.visual)}<span class="mn">${esc(group.name)}</span>${group.accounts.length > 1 ? `<span class="macc-count">${group.accounts.length}</span>` : ''}${group.identityIds.length ? `<span class="mdots">${group.identityIds.map(idById).filter(Boolean).map(i => `<i style="--c:${esc(i.color)}"></i>`).join('')}</span>` : ''}</button>`).join('')}
+        ${groups.map(group => group.tokens.map((item, k) => tokenNode(item, tokenYs[group.key][k], group)).join('')).join('')}`;
       built = dataVer + ':' + W;
       apply(); if (running) draw();
     }
@@ -1453,17 +1538,25 @@
     function apply() {
       const box = $('#mapBox'); if (!box) return;
       box.classList.toggle('focus', !!sel);
-      const linked = new Set(sel ? accountsOf(sel).map(a => a.id) : []);
+      const linkedGroups = new Set(sel ? [...groupsByKey.values()].filter(group => group.identityIds.includes(sel)).map(group => group.key) : []);
+      const linkedTokens = new Set(sel ? [...tokenLinksByKey].filter(([, item]) => item.identities.some(i => i.id === sel)).map(([key]) => key) : []);
+      const paintToken = (el, key) => {
+        const item = tokenLinksByKey.get(key); if (!item) return;
+        const selectedIdentity = sel ? item.identities.find(i => i.id === sel) : null;
+        el.style.setProperty('--c', selectedIdentity?.color || item.color);
+      };
       $$('.threads path:not(.tok-thread)', box).forEach(p => p.classList.toggle('on', p.dataset.i === sel));
-      $$('.threads path.tok-thread', box).forEach(p => p.classList.toggle('on', linked.has(p.dataset.a)));
+      $$('.threads path.tok-thread', box).forEach(p => { p.classList.toggle('on', linkedTokens.has(p.dataset.link)); paintToken(p, p.dataset.link); });
       $$('.mcard', box).forEach(c => c.classList.toggle('on', c.dataset.mapIdentity === sel));
-      $$('.mapp', box).forEach(c => c.classList.toggle('on', linked.has(c.dataset.account)));
-      $$('.mtok-group', box).forEach(c => c.classList.toggle('on', linked.has(c.dataset.mapTokenAccount)));
+      $$('.mapp', box).forEach(c => c.classList.toggle('on', linkedGroups.has(c.dataset.mapPlatform)));
+      $$('.mtok-group', box).forEach(c => { c.classList.toggle('on', linkedTokens.has(c.dataset.mapTokenLink)); paintToken(c, c.dataset.mapTokenLink); });
     }
     document.addEventListener('click', e => {
       if (ui.tab !== 'graph' || e.target.closest('.sheet,.menu,#tabbar,.top')) return;
       const tok = e.target.closest('[data-map-token]');
       if (tok) { window.TokiTokens?.edit?.(tok.dataset.mapToken); return; }
+      const platform = e.target.closest('[data-map-platform]');
+      if (platform) { const group = groupsByKey.get(platform.dataset.mapPlatform); if (group) showPlatformAccounts(group.accounts, group.name); return; }
       const c = e.target.closest('[data-map-identity]');
       if (c) { const id = c.dataset.mapIdentity; if (sel === id) showIdentity(id); else { sel = id; apply(); } return; }
       if (!e.target.closest('.mapp') && sel) { sel = null; apply(); }
@@ -1552,7 +1645,7 @@
       out.identities.sort((x, y) => (x.order ?? 1e9) - (y.order ?? 1e9));
       // drop links to identities/accounts that no longer exist
       const ids = new Set(out.identities.map(i => i.id));
-      out.accounts.forEach(x => { x.identityIds = x.identityIds.filter(i => ids.has(i)); });
+      out.accounts.forEach(x => { x.identityIds = identityIdsOf(x).filter(i => ids.has(i)); });
       repairTokenLinks(out, true);
       // forget tombstones older than 90 days
       const old = Date.now() - 90 * DAY; for (const [id, t] of Object.entries(del)) if (t < old) delete del[id];
