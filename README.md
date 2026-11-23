@@ -14,9 +14,9 @@
 
 - **卡包**：统一管理邮箱、手机号与第三方登录身份
 - **网站与 App**：记录账号名、分类、绑定身份及备注；支持预设搜索和自定义图标
-- **Tokens**：管理 API Key、Access Token、GitHub/Gist Token 等；支持平台联想、自定义分类、打码显示、复制和到期提醒
-- **账号关联**：Token 可关联到具体平台账号，例如 `GitHub · alice`，支持同一平台多个账号
-- **关系图**：以“身份 → 网站账号 → 密钥”三列显示关联关系
+- **Tokens**：平台与密钥名称分开管理；密钥可自定义用途名称，并支持分类、打码显示、复制和到期提醒
+- **账号关联**：先选平台，再从同平台账号中精确选择，例如 `GitHub · alice`；支持同一平台多个账号
+- **关系图**：以“身份 → 网站账号 → 密钥组”三列显示；每个账号聚合其密钥，未关联密钥在底部折叠
 - **加密同步（可选）**：AES-GCM 端到端加密，密文可保存到自己的 Gitee 或 GitHub 私有 Gist
 - **隐私模式 / 深浅色 / 离线 PWA / JSON 导入导出**
 
@@ -67,14 +67,15 @@ python3 -m http.server 8080
     { "id": "", "name": "", "handle": "", "domain": "", "category": "", "identityIds": [] }
   ],
   "tokens": [
-    { "id": "", "name": "", "domain": "", "category": "", "value": "", "accountId": "", "expiresAt": 0 }
+    { "id": "", "platform": "GitHub", "name": "博客部署 PAT", "domain": "github.com", "category": "GitHub", "value": "", "accountId": "", "expiresAt": 0 }
   ],
   "deleted": {}
 }
 ```
 
 - `identityIds` 让一个网站账号关联一个或多个邮箱、手机号、第三方登录身份。
-- `accountId` 让一条 Token 精确关联到某个网站账号，能区分同一平台下的多个账号。
+- `platform` 是平台名称，用于默认 logo、域名和账号匹配；`name` 是用户自定义的密钥用途名称。
+- `accountId` 让一条 Token 精确关联到某个网站账号，能区分同一平台下的多个账号。旧数据没有 `platform` 时会按域名或旧名称自动推断。
 - 导出备份会包含完整数据；请像保管密码一样妥善保管备份文件。
 
 ## 隐私
