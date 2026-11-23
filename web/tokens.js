@@ -83,14 +83,25 @@
   function accountName(id) { const a = allAccounts().find(x => x.id === id); return a ? a.name + (a.handle ? ' · ' + a.handle : '') : ''; }
   const normKey = s => { const d = ctx?.cleanDomain?.(s) || String(s || '').trim().toLowerCase(); return d.replace(/^www\./, ''); };
   // 把账号按「平台」分组：同一域名/名称下的多个账号归到一组（如 3 个 GitHub 账号）
-  function accountGroups() {
+  // 关联账号选择器只展示开发/AI/工具类平台，购物、社交、娱乐等不参与
+  const PICK_CATS = ['开发', 'AI', '工具', '加密', '支付金融', '数据库'];
+  // 技术平台域名/名称关键词（即使账号分类被乱填也能识别）
+  const DEV_DOMAINS = ['github.com','gitee.com','gitlab.com','bitbucket.org','openai.com','anthropic.com','claude.ai','deepseek.com','moonshot.cn','kimi.com','bigmodel.cn','aliyun.com','tencent.com','google.com','googleapis.com','cloudflare.com','vercel.com','aws.amazon.com','azure.com','supabase.com','mongodb.com','npmjs.com','docker.com','huggingface.co','openrouter.ai','vercel.app','netlify.app','cloud.tencent.com','volcengine.com','cohere.com','mistral.ai'];
+  const DEV_WORDS = ['GitHub','Gitee','GitLab','OpenAI','Claude','Anthropic','DeepSeek','Kimi','智谱','通义','豆包','OpenRouter','Gemini','Cloudflare','Vercel','AWS','阿里云','腾讯云','Supabase','MongoDB','npm','Docker','Hugging','Cursor','API'];
+  const isDevGroup = g => PICK_CATS.includes(g.cat) || DEV_DOMAINS.some(d => g.domain === d || g.domain.endsWith('.' + d)) || DEV_WORDS.some(w => g.name.toLowerCase().includes(w.toLowerCase()));
+  function accountGroups(keepId) {
     const groups = new Map();
     for (const a of allAccounts()) {
       const key = normKey(a.domain || a.name);
-      if (!groups.has(key)) groups.set(key, { key, name: a.name, domain: a.domain || '', accounts: [] });
+      if (!groups.has(key)) groups.set(key, { key, name: a.name, domain: a.domain || '', cat: a.category || '其他', accounts: [] });
       groups.get(key).accounts.push(a);
     }
-    return [...groups.values()].sort((x, y) => zh(x.name, y.name));
+    // 当前已关联的平台即使被过滤也保留（编辑时找得到）
+    const ka = keepId && allAccounts().find(a => a.id === keepId);
+    const keepKey = ka ? normKey(ka.domain || ka.name) : '';
+    return [...groups.values()]
+      .filter(g => isDevGroup(g) || g.key === keepKey)
+      .sort((x, y) => zh(x.name, y.name));
   }
 
   function renderTokens() {
@@ -162,8 +173,10 @@
         <div class="field"><label>分类</label><input id="tokCategory" list="tokCatList" value="${esc(t.category || '')}" placeholder="手填分类，可自定义" autocomplete="off"><datalist id="tokCatList">${catOptions}</datalist></div>
         <div class="field"><label>密钥</label><input id="tokValue" type="password" value="${esc(t.value)}" placeholder="粘贴 Token / Key" autocomplete="off" spellcheck="false"></div>
         <div class="field"><label>到期日</label><input id="tokExpiry" type="date" value="${t.expiresAt ? new Date(t.expiresAt).toISOString().slice(0, 10) : ''}"></div>
-        <button class="field link-field" id="tokAccountBtn"><label>关联账号</label><span class="link-val" id="tokAccountVal">${linkedName ? esc(linkedName) : '<em>未关联</em>'}</span><span class="link-chev">›</span></button>
-        <div class="acc-picker" id="accPicker" hidden></div>
+        <div class="acc-anchor">
+          <button class="field link-field" id="tokAccountBtn"><label>关联账号</label><span class="link-val" id="tokAccountVal">${linkedName ? esc(linkedName) : '<em>未关联</em>'}</span><span class="link-chev">›</span></button>
+          <div class="acc-picker" id="accPicker" hidden></div>
+        </div>
         <div class="field stack"><textarea id="tokNotes" placeholder="用途、权限范围…" spellcheck="false">${esc(t.notes)}</textarea></div>
       </div>
       <p class="hint">到期日只作为提醒，不会在本地或云端存储任何真实密钥以外的信息。</p>
@@ -231,31 +244,58 @@
     if (ui._paintHero) ui._paintHero($('#tokName')?.value, $('#tokDomain')?.value);
   }
 
-  // 两级「关联账号」选择：先平台，再该平台下的具体账号（表单内内联展开，不丢失其它输入）
+  // 两级「关联账号」选择：浮层从按钮上方弹出，选完自动收起并在关联栏明确回显
   function wireAccountPicker() {
     const btn = $('#tokAccountBtn'), box = $('#accPicker'); if (!btn || !box) return;
-    const groups = accountGroups();
+    const groups = accountGroups(ui.tokenAccountId);
     let step = 'group';
-    const setVal = () => { const val = $('#tokAccountVal'); if (val) val.innerHTML = ui.tokenAccountId ? esc(accountName(ui.tokenAccountId)) : '<em>未关联</em>'; };
+    const setVal = () => {
+      const val = $('#tokAccountVal'); if (!val) return;
+      const a = ui.tokenAccountId && allAccounts().find(x => x.id === ui.tokenAccountId);
+      btn.classList.toggle('linked', !!a);
+      val.innerHTML = a ? `${favicon(a)}<span>${esc(a.name)}${a.handle ? ' · ' + esc(a.handle) : ''}</span>` : '<em>未关联</em>';
+    };
     const close = () => { box.hidden = true; box.innerHTML = ''; btn.classList.remove('open'); };
+    const place = () => {
+      const r = btn.getBoundingClientRect();
+      const w = Math.min(Math.max(r.width, 260), Math.min(520, innerWidth - 24));
+      box.style.left = Math.max(12, Math.min(r.left, innerWidth - w - 12)) + 'px';
+      box.style.width = w + 'px';
+      // 先渲染再量高度，优先放到按钮上方；上方不够则放下方
+      box.style.top = '0px'; box.style.maxHeight = '';
+      const h = box.offsetHeight, gap = 8;
+      const above = r.top - gap - h, below = r.bottom + gap;
+      const maxH = Math.max(160, (above >= 12 ? above : innerHeight - below - 12));
+      box.style.maxHeight = maxH + 'px';
+      const top = above >= 12 ? above : Math.min(below, innerHeight - Math.min(h, maxH) - 12);
+      box.style.top = Math.max(12, top) + 'px';
+    };
     const draw = () => {
       box.hidden = false;
       btn.classList.add('open');
       if (step === 'group') {
-        box.innerHTML = `<div class="acc-pick-hint">先选平台</div><div class="acc-grid">${groups.map(g => `<button class="acc-tile" data-accgroup="${esc(g.key)}">${favicon({ name: g.name, domain: g.domain })}<span>${esc(g.name)}</span><small>${g.accounts.length} 个账号</small></button>`).join('')}</div>`;
+        box.innerHTML = `<div class="acc-pick-hint">先选平台 <button class="acc-close" id="accClose">完成</button></div><div class="acc-grid">${groups.map(g => `<button class="acc-tile" data-accgroup="${esc(g.key)}">${favicon({ name: g.name, domain: g.domain })}<span>${esc(g.name)}</span><small>${g.accounts.length} 个账号</small></button>`).join('')}</div>`;
+        $('#accClose').onclick = close;
         $$('#accPicker [data-accgroup]').forEach(b => b.onclick = () => { const g = groups.find(x => x.key === b.dataset.accgroup); step = 'account'; ui.accPickGroup = g; draw(); });
       } else {
         const g = ui.accPickGroup;
-        box.innerHTML = `<div class="acc-pick-hint"><button class="acc-back" id="accBack">‹ ${esc(g.name)}</button><span>选具体账号</span></div><div class="acc-list">${g.accounts.map(a => `<button class="acc-acc ${a.id === ui.tokenAccountId ? 'on' : ''}" data-accid="${esc(a.id)}">${favicon(a)}<span class="acc-acc-main"><b>${esc(a.name)}</b>${a.handle ? `<small>${esc(a.handle)}</small>` : ''}</span><span class="tick">${a.id === ui.tokenAccountId ? '✓' : ''}</span></button>`).join('')}</div>`;
+        box.innerHTML = `<div class="acc-pick-hint"><button class="acc-back" id="accBack">‹ ${esc(g.name)}</button><span>选具体账号</span><button class="acc-close" id="accClose">完成</button></div><div class="acc-list">${g.accounts.map(a => `<button class="acc-acc ${a.id === ui.tokenAccountId ? 'on' : ''}" data-accid="${esc(a.id)}">${favicon(a)}<span class="acc-acc-main"><b>${esc(a.name)}</b>${a.handle ? `<small>${esc(a.handle)}</small>` : ''}</span><span class="tick">${a.id === ui.tokenAccountId ? '✓' : ''}</span></button>`).join('')}</div>`;
         $('#accBack').onclick = () => { step = 'group'; draw(); };
+        $('#accClose').onclick = close;
         $$('#accPicker [data-accid]').forEach(b => b.onclick = () => {
+          // 点选即确定：自动收起浮层，关联栏清晰回显
           ui.tokenAccountId = b.dataset.accid === ui.tokenAccountId ? '' : b.dataset.accid;
-          setVal();
-          $$('#accPicker .acc-acc').forEach(x => { const on = x.dataset.accid === ui.tokenAccountId; x.classList.toggle('on', on); x.querySelector('.tick').textContent = on ? '✓' : ''; });
+          setVal(); close();
         });
       }
+      place();
     };
-    btn.onclick = () => { if (!groups.length) { toast('先在「网站与 App」里添加一个账号'); return; } if (!box.hidden) { close(); return; } step = 'group'; draw(); };
+    btn.onclick = e => { e.stopPropagation(); if (!groups.length) { toast('先在「网站与 App」里添加一个开发/AI 类账号'); return; } if (!box.hidden) { close(); return; } step = 'group'; draw(); };
+    box.addEventListener('click', e => e.stopPropagation());
+    if (ui._accOutside) document.removeEventListener('click', ui._accOutside);
+    ui._accOutside = ev => { if (box.hidden) return; if (!ev.target.closest('#accPicker,#tokAccountBtn')) close(); };
+    document.addEventListener('click', ui._accOutside);
+    setVal();
   }
   function readTokenForm() {
     const name = $('#tokName')?.value.trim();
