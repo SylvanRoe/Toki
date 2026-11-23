@@ -1,4 +1,4 @@
-import { Script } from "scripting"
+import { Navigation, Script, WebView } from "scripting"
 
 const WEB_ROOT = `${FileManager.scriptsDirectory}/Toki/web`
 const ENTRY = `${WEB_ROOT}/index.html`
@@ -48,7 +48,18 @@ async function main() {
     const loaded = await webView.loadFile(ENTRY, WEB_ROOT)
     if (!loaded) throw new Error("本地网页资源加载失败")
     await webView.waitForLoad({ timeout: 20 })
-    await webView.present({ fullscreen: true })
+    await Navigation.present({
+      element: (
+        <WebView
+          controller={webView}
+          frame={{ maxWidth: "infinity", maxHeight: "infinity" }}
+          navigationBarVisibility="hidden"
+          ignoresSafeArea
+        />
+      ),
+      modalPresentationStyle: "fullScreen",
+      swipeBackBehavior: "dismiss",
+    })
   } catch (error) {
     await Dialog.alert({ title: "Toki 无法打开", message: error instanceof Error ? error.message : String(error) })
   } finally {
