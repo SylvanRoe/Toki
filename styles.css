@@ -427,12 +427,14 @@ body.is-empty main .block, body.is-empty #dots{display:none}
 .mcard:has(.ms) .mv{margin-top:2px}
 .map.focus .mcard{opacity:.4}
 .map.focus .mcard.on{opacity:1;transform:scale(1.04)}
-.mapp{position:absolute;height:54px;display:flex;align-items:center;gap:8px;text-align:left;transition:opacity .3s;padding-right:4px}
-.mapp .icon{width:30px;height:30px;border-radius:8px;flex:none}
-.mapp .fav.letter{font-size:14px}
-.mn{font-size:13.5px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0;flex:1}
-.mdots{display:flex;gap:3px;flex:none;padding-right:2px}
+.mapp{position:absolute;height:54px;display:flex;align-items:center;gap:5px;text-align:left;transition:opacity .3s;padding-right:2px}
+.mapp .icon{width:26px;height:26px;border-radius:7px;flex:none}
+.mapp .fav.letter{font-size:13px}
+.mn{font-size:13px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0;flex:1}
+.mdots{position:absolute;left:31px;bottom:7px;display:flex;gap:3px;padding:0}
 .mdots i{width:6px;height:6px;border-radius:50%;background:var(--c)}
+.mapp:has(.mdots) .mn{font-size:11px;transform:translateY(-6px)}
+.macc-count{position:absolute;left:18px;top:3px;min-width:15px;height:15px;padding:0 3px;border-radius:8px;display:grid;place-items:center;background:var(--c);color:#fff;border:1.5px solid var(--bg);font-size:9px;font-weight:700;line-height:1}
 .mapp.loose .icon{opacity:.5}
 .map.focus .mapp{opacity:.28}
 .map.focus .mapp.on{opacity:1}
@@ -450,8 +452,9 @@ body.is-empty main .block, body.is-empty #dots{display:none}
 .mtg-state{display:none;width:6px;height:6px;border-radius:50%;flex:none}.mtg-state.soon{display:block;background:#ff9f0a}.mtg-state.expired{display:block;background:var(--red)}
 .mtok-group.soon{border-color:color-mix(in srgb,#ff9f0a 55%,transparent)}.mtok-group.expired{border-color:color-mix(in srgb,var(--red) 55%,transparent)}
 .mtg-names{display:block;min-width:0;line-height:1.1}
-.mtg-names b{position:relative;display:flex;align-items:center;gap:3px;min-width:0;font-size:9.5px;font-weight:500;color:var(--secondary);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.mtg-names b{position:relative;display:flex;align-items:center;gap:3px;min-width:0;font-size:9.5px;font-weight:500;color:var(--secondary);white-space:nowrap;overflow:hidden}
 .mtg-names b i{width:5px;height:5px;border-radius:50%;background:var(--c);flex:none}.mtg-names b i.soon{background:#ff9f0a}.mtg-names b i.expired{background:var(--red)}
+.mtg-ids{display:flex;align-items:center;gap:2px;flex:none}.mtg-owner{min-width:0;overflow:hidden;text-overflow:ellipsis}
 .mtok-group .link-chev{font-size:15px;padding:0}
 .map.focus .mtok-group{opacity:.24}
 .map.focus .mtok-group.on{opacity:1;transform:scale(1.03)}
