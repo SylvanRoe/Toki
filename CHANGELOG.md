@@ -2,6 +2,10 @@
 
 所有版本同时适用于网页版 / PWA 与 Scripting 打包版。
 
+## 1.0.4 - 2026-11-23
+
+- Scripting 脚本卡片背景色改为 Logo 中的紫色 `#7C5CFF`，与品牌视觉统一
+
 ## 1.0.3 - 2026-11-23
 
 - 修正 Scripting 配置中的 Logo 链接，使用指定的 GitHub Raw 地址
