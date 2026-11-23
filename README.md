@@ -1,36 +1,104 @@
 <p align="center"><img src="web/icon-512.png" width="112" alt="Toki"></p>
 <h1 align="center">Toki</h1>
-<p align="center">账号与 Token 管理，一眼看清 · 本地优先的网页版 / PWA</p>
-<p align="center"><b>Toki</b> 取自 Token 的趣味音译。API Key、Access Token、GitHub/Gist Token 与各类账号，本地优先、统一收纳。</p>
-<p align="center"><a href="https://sylvanroe.github.io/Toki/"><b>打开 Toki 网页版</b></a></p>
+<p align="center">这个邮箱注册过什么？那个手机号绑了哪些 App？哪些账号正在使用哪些 Token？一眼看清。</p>
+<p align="center"><b>账号与 Token 管理 · 本地优先 · 网页 / PWA / Scripting</b></p>
+<p align="center"><b>当前版本：1.0.1</b></p>
+<p align="center">
+  <a href="https://sylvanroe.github.io/Toki/"><b>打开网页版</b></a> ·
+  <a href="https://www.scripting.fun/import_scripts/?urls=%5B%22https%3A%2F%2Fgithub.com%2FSylvanRoe%2FToki%2Fraw%2Frefs%2Ftags%2Fv1.0.1%2FToki.scripting%22%5D"><b>导入 Scripting 版 1.0.1</b></a> ·
+  <a href="https://github.com/SylvanRoe/Toki-legacy">历史版本</a>
+</p>
 
 ---
 
-## 当前状态
+**Toki** 取自 Token 的趣味音译。它用“身份 → 平台 → 密钥”的方式统一收纳邮箱、手机号、第三方登录、网站账号、API Key、Access Token 和 GitHub/Gist Token。
 
-本仓库目前**只维护网站端**。旧的 Scripting 实现已移除；等网页功能和数据模型稳定后，再以当前网站端为准重新迁移、重写原生客户端与小组件。
+Toki 的关系管理思路源自「账号星图 · Atlas」：这个邮箱注册过什么、那个手机号绑定了哪些 App，不再依靠记忆。Toki 在此基础上加入了 Token 管理、具体账号关联、到期提醒和三列关系图。
 
-## 功能
+## 它能做什么
 
-- **卡包**：统一管理邮箱、手机号与第三方登录身份
-- **网站与 App**：记录账号名、分类、绑定身份及备注；支持预设搜索和自定义图标
-- **Tokens**：新建时优先从已有账号选择同名平台，平台与具体账号保持对应；密钥可自定义用途名称，并支持分类、打码显示、复制和到期提醒，有效期默认无限期
-- **账号关联**：先选平台，再从同平台账号中精确选择，例如 `GitHub · alice`；支持同一平台多个账号
-- **关系图**：以“身份 → 平台 → 密钥”三列显示；同平台的多个具体账号聚合为一个节点（例如两个 GitHub 账号只显示一个 GitHub），每条密钥仍精确对应具体账号并沿用其邮箱/身份颜色；未关联具体账号的密钥不进入关系图
-- **加密同步（可选）**：AES-GCM 端到端加密，密文可保存到自己的 Gitee 或 GitHub 私有 Gist
-- **隐私模式 / 深浅色 / 离线 PWA / JSON 导入导出**
+- **卡包**：每个邮箱、手机号和第三方登录身份都有自己的颜色与关联计数
+- **网站与 App**：内置常用平台，记录具体账号名、域名、自由分类、绑定身份、备注和自定义图标
+- **点选添加**：从常用平台或已有账号中选择；同一平台可记录多个具体账号
+- **Tokens**：平台与用途名称分开管理，密钥默认打码；有效期默认无限期，也可指定日期
+- **精确账号关联**：每条密钥关联到同平台下的具体账号，例如 `GitHub · alice`
+- **关系图**：身份 → 平台 → 密钥；同平台只显示一个节点，密钥连线继承所属邮箱/身份颜色
+- **隐私模式**：号码、邮箱和账号名一键打码，截图分享更安心
+- **深色 / 浅色**：支持系统主题切换
+- **加密同步（可选）**：在本机使用同步密码进行 AES-GCM 加密，再保存到自己的 Gitee 或 GitHub 私密 Gist
+- **备份与离线**：JSON 导入导出，PWA 与 Scripting 打包版均可离线打开
 
-## 快速开始
+## 使用方式
 
-### 在线使用
+### 网页版 / PWA
 
 访问：**https://sylvanroe.github.io/Toki/**
 
-在 iPhone Safari 中选择“添加到主屏幕”，即可作为 PWA 使用。
+在 iPhone 或 iPad Safari 中打开分享菜单，选择“添加到主屏幕”，即可全屏使用。数据默认保存在当前浏览器；换设备前请开启加密同步或导出 JSON。
 
-### 本地运行
+### Scripting 版
 
-项目是零依赖的纯 HTML/CSS/JS 静态站点：
+Scripting 版把同版本网页应用完整打包到脚本中，本地 WebView 直接加载，因此 UI、动画、四页结构、表单和关系图与网页版一致。
+
+- [一键导入当前稳定版 1.0.1](https://www.scripting.fun/import_scripts/?urls=%5B%22https%3A%2F%2Fgithub.com%2FSylvanRoe%2FToki%2Fraw%2Frefs%2Ftags%2Fv1.0.1%2FToki.scripting%22%5D)
+- 或下载标签 `v1.0.1` 中的 [`Toki.scripting`](https://github.com/SylvanRoe/Toki/raw/refs/tags/v1.0.1/Toki.scripting) 后导入 Scripting
+
+静态网页资源随脚本安装；同步、在线图标回退和外部链接仍需网络。
+
+## 双端同步发行与回退
+
+从 **1.0.1** 起，网页版与 Scripting 版使用同一个版本号同步发行：
+
+1. `web/` 是 UI 和功能的唯一源版本
+2. 发版时把 `web/` 的完整快照同步到 `scripting/web/`
+3. 同步更新根目录 `VERSION`、`scripting/script.json` 和 `CHANGELOG.md`
+4. 重新生成根目录 `Toki.scripting`
+5. 创建 `vX.Y.Z` Git 标签；标签中的源码和安装包保持不可变
+
+需要回退时，直接切换到对应 Git 标签，或安装该标签中的 `Toki.scripting`。完整步骤见 [RELEASING.md](RELEASING.md)。
+
+## 数据互通
+
+网页和 Scripting 使用相同的导入导出格式：
+
+```json
+{
+  "app": "toki",
+  "version": 3,
+  "identities": [],
+  "accounts": [],
+  "tokens": []
+}
+```
+
+- `identityIds`：具体网站账号关联的邮箱、手机号或第三方登录身份
+- `platform`：密钥所属平台；`name`：用户自定义的密钥用途
+- `accountId`：密钥精确关联的具体账号
+- `expiresAt: 0`：无限期
+
+## 隐私
+
+- 数据默认只保存在当前设备
+- 未开启同步时，不上传身份、账号或密钥数据
+- 开启同步后，远端只保存 AES-GCM 加密密文
+- Toki 不记录网站密码
+- JSON 备份包含完整密钥，请像保管密码一样妥善保管
+
+## 项目结构
+
+```text
+.
+├── web/                    # 网页 / PWA 唯一功能源
+├── scripting/              # Scripting 包装层与同版本网页快照
+├── Toki.scripting          # 当前版本可导入安装包
+├── VERSION                 # 当前统一版本号
+├── CHANGELOG.md
+├── RELEASING.md
+├── LICENSE
+└── README.md
+```
+
+## 本地运行
 
 ```bash
 cd web
@@ -39,57 +107,11 @@ python3 -m http.server 8080
 
 浏览器打开 `http://localhost:8080`。
 
-## 项目结构
-
-```text
-.
-├── web/
-│   ├── index.html
-│   ├── app.js               # 卡包、网站账号、关系图与加密同步
-│   ├── tokens.js            # Token 管理、账号关联与平台联想
-│   ├── styles.css
-│   ├── sw.js
-│   ├── manifest.webmanifest
-│   ├── icon.png / icon-512.png / logo.svg
-│   └── icons/               # 内置站点图标
-├── LICENSE
-└── README.md
-```
-
-## 数据模型
-
-```json
-{
-  "identities": [
-    { "id": "", "type": "email|phone|login", "value": "", "label": "", "color": "" }
-  ],
-  "accounts": [
-    { "id": "", "name": "", "handle": "", "domain": "", "category": "", "identityIds": [] }
-  ],
-  "tokens": [
-    { "id": "", "platform": "GitHub", "name": "博客部署 PAT", "domain": "github.com", "category": "GitHub", "value": "", "accountId": "", "expiresAt": 0 }
-  ],
-  "deleted": {}
-}
-```
-
-- `identityIds` 让一个网站账号关联一个或多个邮箱、手机号、第三方登录身份。
-- `platform` 是平台名称，用于默认 logo、域名和账号匹配；`name` 是用户自定义的密钥用途名称。
-- `accountId` 让一条 Token 精确关联到某个网站账号，能区分同一平台下的多个账号。旧数据没有 `platform` 时会按域名或旧名称自动推断。
-- 导出备份会包含完整数据；请像保管密码一样妥善保管备份文件。
-
-## 隐私
-
-- 数据默认仅保存在当前浏览器的 `localStorage` 中。
-- 未开启同步时，不上传账号或密钥数据。
-- 开启同步后，远端仅保存经 AES-GCM 加密的密文。
-- 密钥默认打码显示；复制操作不会写入应用日志。
-
 ## 致谢与许可
 
-Toki 的网站端代码最初源自 [Ckxkx/account-atlas](https://github.com/Ckxkx/account-atlas)（GPL-3.0），并在其基础上新增 Tokens、具体账号关联和三列关系图等功能。项目遵循 GPL-3.0：可自由使用、修改和再分发，衍生作品请同样以 GPL-3.0 开源并保留声明。
+Toki 的网站端最初源自 [Ckxkx/account-atlas](https://github.com/Ckxkx/account-atlas)，旧分支与历史资料保存在 [SylvanRoe/Toki-legacy](https://github.com/SylvanRoe/Toki-legacy)。原项目的卡包、关系图、本地优先、隐私模式和加密同步设计为 Toki 提供了基础。
 
-Toki 的 Logo 与图标为原创；内置站点图标归各自所有者。
+代码采用 [GPL-3.0](LICENSE)：可以使用、修改和再分发；发布修改版或衍生作品时，必须同样以 GPL-3.0 开源并保留版权与许可声明。内置第三方网站与 App 图标归各自所有者。
 
 ---
 
