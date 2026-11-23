@@ -833,15 +833,21 @@ html[data-theme=light] .tok-blur{opacity:.1}
 html[data-theme=light] .tok-cat{background:#f2f2f7}
 html[data-theme=light] .tok-actions button{background:#f2f2f7;color:#3a3a3c}
 /* 关联账号：跳转行 + 内联两级选择 */
+.acc-anchor{position:relative}
 .link-field{width:100%;background:none;border:0;color:inherit;cursor:pointer;text-align:left}
 .link-field:active{opacity:.6}
 .link-field label{width:64px;flex:none;font-size:16px}
-.link-val{flex:1;min-width:0;font-size:17px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.link-val{flex:1;min-width:0;font-size:17px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;display:flex;align-items:center;gap:8px}
+.link-val .icon{width:24px;height:24px;border-radius:6px;flex:none}
 .link-val em{color:var(--tertiary);font-style:normal}
-.link-chev{color:var(--tertiary);font-size:22px;line-height:1;flex:none;padding-right:2px}
-.link-field.open .link-chev{transform:rotate(90deg)}
-.acc-picker{padding:12px 16px 16px;background:var(--fill);margin:0 12px 0;border-radius:14px}
+.link-field.linked .link-val{color:var(--tint);font-weight:600}
+.link-chev{color:var(--tertiary);font-size:22px;line-height:1;flex:none;padding-right:2px;transition:transform .2s}
+.link-field.open .link-chev{transform:rotate(-90deg)}
+.acc-picker{position:fixed;z-index:60;padding:12px 14px 14px;background:rgba(44,44,46,.97);backdrop-filter:blur(20px);border:1px solid var(--separator);border-radius:16px;box-shadow:0 12px 40px rgba(0,0,0,.5);max-height:min(56vh,400px);overflow-y:auto;animation:accPop .22s var(--bounce) backwards}
+@keyframes accPop{from{opacity:0;transform:translateY(10px) scale(.97)}to{opacity:1;transform:none}}
 .acc-picker[hidden]{display:none}
+.acc-close{margin-left:auto;background:none;border:0;color:var(--tint);font-size:14px;font-weight:600;padding:0}
+.acc-close:active{opacity:.5}
 .acc-pick-hint{display:flex;align-items:center;gap:10px;font-size:13px;color:var(--secondary);font-weight:600;margin:2px 0 12px}
 .acc-back{background:none;border:0;color:var(--tint);font-size:14px;padding:0;font-weight:600}
 .acc-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(88px,1fr));gap:10px}
@@ -860,5 +866,6 @@ html[data-theme=light] .tok-actions button{background:#f2f2f7;color:#3a3a3c}
 .acc-acc .tick{color:var(--tint);font-weight:700;flex:none;width:16px;text-align:center}
 /* token 表单 hero 用通用 hero-icon，图标尺寸对齐账号 */
 #tokHero .hero-icon .icon{width:72px;height:72px;border-radius:17px}
-html[data-theme=light] .acc-tile{background:#fff}
+html[data-theme=light] .acc-picker{background:rgba(255,255,255,.98);box-shadow:0 -12px 40px rgba(0,0,0,.16)}
+html[data-theme=light] .acc-tile{background:#f2f2f7}
 html[data-theme=light] .acc-acc.on{background:rgba(0,0,0,.05)}
