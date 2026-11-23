@@ -3,17 +3,10 @@
 <p align="center">这个邮箱注册过什么？那个手机号绑了哪些 App？哪些账号正在使用哪些 Token？一眼看清。</p>
 <p align="center"><b>账号与 Token 管理 · 本地优先 · 网页 / PWA / Scripting</b></p>
 <p align="center"><b>当前版本：1.0.1</b></p>
-<p align="center">
-  <a href="https://sylvanroe.github.io/Toki/"><b>打开网页版</b></a> ·
-  <a href="https://www.scripting.fun/import_scripts/?urls=%5B%22https%3A%2F%2Fgithub.com%2FSylvanRoe%2FToki%2Fraw%2Frefs%2Ftags%2Fv1.0.1%2FToki.scripting%22%5D"><b>导入 Scripting 版 1.0.1</b></a> ·
-  <a href="https://github.com/SylvanRoe/Toki-legacy">历史版本</a>
-</p>
 
 ---
 
 **Toki** 取自 Token 的趣味音译。它用“身份 → 平台 → 密钥”的方式统一收纳邮箱、手机号、第三方登录、网站账号、API Key、Access Token 和 GitHub/Gist Token。
-
-Toki 的关系管理思路源自「账号星图 · Atlas」：这个邮箱注册过什么、那个手机号绑定了哪些 App，不再依靠记忆。Toki 在此基础上加入了 Token 管理、具体账号关联、到期提醒和三列关系图。
 
 ## 它能做什么
 
@@ -38,24 +31,11 @@ Toki 的关系管理思路源自「账号星图 · Atlas」：这个邮箱注册
 
 ### Scripting 版
 
-Scripting 版把同版本网页应用完整打包到脚本中，本地 WebView 直接加载，因此 UI、动画、四页结构、表单和关系图与网页版一致。
+Scripting 版直接打包同一份 `web/`，由本地 WebView 加载，因此 UI、动画、四页结构、表单和关系图与网页版一致。
 
-- [一键导入当前稳定版 1.0.1](https://www.scripting.fun/import_scripts/?urls=%5B%22https%3A%2F%2Fgithub.com%2FSylvanRoe%2FToki%2Fraw%2Frefs%2Ftags%2Fv1.0.1%2FToki.scripting%22%5D)
-- 或下载标签 `v1.0.1` 中的 [`Toki.scripting`](https://github.com/SylvanRoe/Toki/raw/refs/tags/v1.0.1/Toki.scripting) 后导入 Scripting
+[一键导入 Scripting 版](https://www.scripting.fun/import_scripts/?urls=%5B%22https%3A%2F%2Fgithub.com%2FSylvanRoe%2FToki%2Fraw%2Frefs%2Fheads%2Fmain%2FToki.scripting%22%5D)
 
 静态网页资源随脚本安装；同步、在线图标回退和外部链接仍需网络。
-
-## 双端同步发行与回退
-
-从 **1.0.1** 起，网页版与 Scripting 版使用同一个版本号同步发行：
-
-1. `web/` 是 UI 和功能的唯一源版本
-2. 发版时把 `web/` 的完整快照同步到 `scripting/web/`
-3. 同步更新根目录 `VERSION`、`scripting/script.json` 和 `CHANGELOG.md`
-4. 重新生成根目录 `Toki.scripting`
-5. 创建 `vX.Y.Z` Git 标签；标签中的源码和安装包保持不可变
-
-需要回退时，直接切换到对应 Git 标签，或安装该标签中的 `Toki.scripting`。完整步骤见 [RELEASING.md](RELEASING.md)。
 
 ## 数据互通
 
@@ -88,10 +68,11 @@ Scripting 版把同版本网页应用完整打包到脚本中，本地 WebView �
 
 ```text
 .
-├── web/                    # 网页 / PWA 唯一功能源
-├── scripting/              # Scripting 包装层与同版本网页快照
-├── Toki.scripting          # 当前版本可导入安装包
-├── VERSION                 # 当前统一版本号
+├── web/                    # 网页 / PWA 与 Scripting 共用的唯一网页源码
+├── index.tsx               # Scripting 本地 WebView 包装入口
+├── script.json             # Scripting 描述与版本
+├── Toki.scripting          # 可直接导入的安装包
+├── VERSION
 ├── CHANGELOG.md
 ├── RELEASING.md
 ├── LICENSE
@@ -109,7 +90,7 @@ python3 -m http.server 8080
 
 ## 致谢与许可
 
-Toki 的网站端最初源自 [Ckxkx/account-atlas](https://github.com/Ckxkx/account-atlas)，旧分支与历史资料保存在 [SylvanRoe/Toki-legacy](https://github.com/SylvanRoe/Toki-legacy)。原项目的卡包、关系图、本地优先、隐私模式和加密同步设计为 Toki 提供了基础。
+Toki 的网站端最初源自 [Ckxkx/account-atlas](https://github.com/Ckxkx/account-atlas)。
 
 代码采用 [GPL-3.0](LICENSE)：可以使用、修改和再分发；发布修改版或衍生作品时，必须同样以 GPL-3.0 开源并保留版权与许可声明。内置第三方网站与 App 图标归各自所有者。
 
