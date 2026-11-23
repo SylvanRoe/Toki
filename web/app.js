@@ -299,7 +299,7 @@
   let toastTimer;
   function toast(msg, action) {
     const t = $('#toast');
-    t.innerHTML = `<img class="ti" src="icon.png?v=4" alt=""><span class="tx"><span class="tn">Toki</span><span class="tt">${esc(msg)}</span></span>${action ? `<button>${esc(action.label)}</button>` : ''}`;
+    t.innerHTML = `<img class="ti" src="icon.png?v=toki11" alt=""><span class="tx"><span class="tn">Toki</span><span class="tt">${esc(msg)}</span></span>${action ? `<button>${esc(action.label)}</button>` : ''}`;
     if (action) t.querySelector('button').onclick = () => { action.fn(); t.classList.remove('show'); };
     t.classList.add('show');
     clearTimeout(toastTimer); toastTimer = setTimeout(() => t.classList.remove('show'), action ? 4500 : 2200);
@@ -346,7 +346,7 @@
     renderSeg();
     w.innerHTML = d.map(i => walletCard(i)).join('') +
       (state.identities.length ? `<button class="wcard ghost ${ui.kind === 'phone' ? 'sim' : ''}" data-new="identity" data-type="${ui.kind}"><div>${ICON.plus}添加${word}</div></button>`
-        : `<button class="wcard ghost first" data-new="identity"><img src="icon.png?v=4" alt=""><b>从一个邮箱或手机号开始</b><span>每张卡片记着它注册、绑定过的网站与 App</span><em>${ICON.plus}添加</em></button>`);
+        : `<button class="wcard ghost first" data-new="identity"><img src="icon.png?v=toki11" alt=""><b>从一个邮箱或手机号开始</b><span>每张卡片记着它注册、绑定过的网站与 App</span><em>${ICON.plus}添加</em></button>`);
     fixStack(w);
     $('#dots').innerHTML = [...d, 0].map((_, k) => `<i class="${k === ui.active ? 'on' : ''}"></i>`).join('');
     ui.active = Math.min(ui.active, d.length);
@@ -1734,7 +1734,7 @@
     const cloud = '<svg viewBox="0 0 24 24"><path d="M7 18a4.5 4.5 0 0 1-.6-8.96A6 6 0 0 1 18 9a4 4 0 0 1-.5 9H7Z"/></svg>';
     if (Sync.on) {
       openSheet(`${closeX}<div class="sheet-body form">
-        <div class="form-hero sync-hero" style="--pc:#0a84ff"><img src="icon.png?v=4" class="icon lg" alt=""><b>加密同步已开启</b><p class="sync-state ${Sync.status.state}" id="syncState">${esc(syncLine())}</p></div>
+        <div class="form-hero sync-hero" style="--pc:#0a84ff"><img src="icon.png?v=toki11" class="icon lg" alt=""><b>加密同步已开启</b><p class="sync-state ${Sync.status.state}" id="syncState">${esc(syncLine())}</p></div>
         <div class="group">
           <button class="cell" id="syncNow"><span class="cell-main"><span class="cell-title tint">立即同步</span></span></button>
         </div>
