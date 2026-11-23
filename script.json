@@ -4,10 +4,10 @@
     "zh": "Toki"
   },
   "icon": "point.3.connected.trianglepath.dotted",
-  "color": "#7C5CFF",
-  "version": "1.0.5",
+  "color": "#2C2C2E",
+  "version": "1.0.6",
   "runInApp": true,
-  "iconImage": "https://raw.githubusercontent.com/SylvanRoe/Toki/main/web/icon-512.png",
+  "iconImage": "https://raw.githubusercontent.com/SylvanRoe/Toki/main/web/icon-512.png?v=2",
   "description": "Toki account and token manager, bundled for offline use.",
   "localizedDescriptions": {
     "zh": "原样打包的 Toki 账号与密钥管理应用，支持离线使用"

@@ -2,6 +2,11 @@
 
 所有版本同时适用于网页版 / PWA 与 Scripting 打包版。
 
+## 1.0.6 - 2026-11-23
+
+- 修正 Scripting 脚本卡片 Logo：`iconImage` 加破缓存参数 `?v=2`，强制刷新为新版图标
+- Scripting 脚本卡片背景色改为石墨黑 `#2C2C2E`
+
 ## 1.0.5 - 2026-11-23
 
 - 全面替换为新版 Toki Logo（圆角方形 TK + 紫色圆环）：更新 PWA 图标、apple-touch-icon、favicon 与 Scripting 脚本图标
