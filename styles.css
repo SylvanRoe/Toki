@@ -439,15 +439,25 @@ body.is-empty main .block, body.is-empty #dots{display:none}
 /* 关系图列标题 + 密钥列 */
 .mcol-head{position:absolute;top:-18px;font-size:11px;font-weight:600;color:var(--tertiary);letter-spacing:.08em;white-space:nowrap}
 .tok-thread{stroke-dasharray:none!important}
-.mtok{position:absolute;height:44px;display:flex;align-items:center;gap:8px;text-align:left;padding:0 8px;border-radius:10px;
-  background:color-mix(in srgb,var(--c) 16%,var(--fill));border:1px solid color-mix(in srgb,var(--c) 32%,transparent);
-  transition:opacity .3s,transform .3s var(--bounce)}
-.mtok:active{transform:scale(.96)}
-.mtok-i{width:24px;height:24px;border-radius:7px;flex:none;display:grid;place-items:center;font-size:12px;font-weight:700;color:#fff;background:var(--c)}
-.mtok-n{font-size:12.5px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0;flex:1}
-.mtok-c{font-size:10px;color:var(--secondary);flex:none;max-width:44px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.map.focus .mtok{opacity:.28}
-.map.focus .mtok.on{opacity:1;transform:scale(1.03)}
+.mtok-group{position:absolute;height:54px;display:flex;align-items:center;gap:6px;text-align:left;padding:5px 6px;border-radius:11px;overflow:hidden;
+  background:color-mix(in srgb,var(--c) 14%,var(--fill));border:1px solid color-mix(in srgb,var(--c) 32%,transparent);transition:opacity .3s,transform .3s var(--bounce)}
+.mtok-group:active{transform:scale(.96)}
+.mtok-group.unlinked{border-style:dashed;background:var(--fill)}
+.mtg-key{width:22px;height:22px;border-radius:7px;display:grid;place-items:center;flex:none;color:#fff;background:var(--c)}
+.mtg-key svg{width:13px;height:13px;stroke-width:2.2}
+.mtg-main{display:flex;flex-direction:column;gap:2px;min-width:0;flex:1}
+.mtg-title{font-size:9.5px;color:var(--secondary);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;display:flex;align-items:center;gap:3px}
+.mtg-state{display:none;width:6px;height:6px;border-radius:50%;flex:none}.mtg-state.soon{display:block;background:#ff9f0a}.mtg-state.expired{display:block;background:var(--red)}
+.mtok-group.soon{border-color:color-mix(in srgb,#ff9f0a 55%,transparent)}.mtok-group.expired{border-color:color-mix(in srgb,var(--red) 55%,transparent)}
+.mtg-names{display:flex;flex-direction:column;min-width:0;line-height:1.1}
+.mtg-names b{position:relative;display:flex;align-items:center;gap:3px;min-width:0;font-size:10.5px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.mtg-names b i{width:5px;height:5px;border-radius:50%;background:var(--c);flex:none}.mtg-names b i.soon{background:#ff9f0a}.mtg-names b i.expired{background:var(--red)}
+.mtg-names em{font-size:9.5px;color:var(--tint);font-style:normal;font-weight:600}
+.mtok-group .link-chev{font-size:15px;padding:0}
+.map.focus .mtok-group{opacity:.24}
+.map.focus .mtok-group.on{opacity:1;transform:scale(1.03)}
+@media(max-width:430px){.mtg-key{display:none}.mtok-group{gap:3px;padding-left:6px}.mtg-title{font-size:9px}}
+@media(min-width:560px){.mtg-names{flex-direction:row;gap:5px;flex-wrap:wrap}.mtg-names b{max-width:46%}}
 .map-tip{color:var(--tertiary);font-size:13px;margin:22px 20px 0}
 .map .empty{padding-top:60px}
 
@@ -824,6 +834,15 @@ html[data-theme=light] .prov-pills button.on[data-p=apple]{background:#1d1d1f;co
 .tok-icon-btn{border:0;background:none;padding:0;cursor:pointer}
 .tok-save-top{color:var(--tint)!important;font-weight:600}
 .tok-form-actions{display:flex;gap:12px;align-items:center;padding:20px 16px 30px}
+.token-group-summary{display:flex;align-items:baseline;gap:6px;margin:8px 4px 14px;color:var(--secondary)}
+.token-group-summary b{font-size:30px;line-height:1;color:var(--label)}
+.token-group-summary span{font-size:13px}
+.token-group-list{overflow:hidden}
+.token-group-row{width:100%;min-height:58px;padding:8px 12px;display:flex;align-items:center;gap:10px;text-align:left;color:inherit;background:none}
+.token-group-row+.token-group-row{box-shadow:inset 0 .5px 0 var(--separator)}
+.token-group-row:active{background:var(--fill)}
+.token-group-row .icon{width:38px;height:38px;border-radius:10px}
+.token-group-row .cell-sub i{font-style:normal}.token-group-row .cell-sub i.soon{color:#ff9f0a}.token-group-row .cell-sub i.expired{color:var(--red)}
 .btn-text{padding:10px 4px;font-size:15px;color:var(--tint)}
 .btn-text.destructive{color:var(--red)}
 .form-hero-icon .tok-fav{width:60px;height:60px;border-radius:16px;font-size:24px}
@@ -832,8 +851,7 @@ html[data-theme=light] .tok-reel{background:#fff;box-shadow:0 1px 2px rgba(0,0,0
 html[data-theme=light] .tok-blur{opacity:.1}
 html[data-theme=light] .tok-cat{background:#f2f2f7}
 html[data-theme=light] .tok-actions button{background:#f2f2f7;color:#3a3a3c}
-/* 关联账号：跳转行 + 内联两级选择 */
-.acc-anchor{position:relative}
+/* Token 平台/账号选择跳转行：子页面仍在同一个 Sheet 内 */
 .link-field{width:100%;background:none;border:0;color:inherit;cursor:pointer;text-align:left}
 .link-field:active{opacity:.6}
 .link-field label{width:64px;flex:none;font-size:16px}
@@ -841,31 +859,5 @@ html[data-theme=light] .tok-actions button{background:#f2f2f7;color:#3a3a3c}
 .link-val .icon{width:24px;height:24px;border-radius:6px;flex:none}
 .link-val em{color:var(--tertiary);font-style:normal}
 .link-field.linked .link-val{color:var(--tint);font-weight:600}
-.link-chev{color:var(--tertiary);font-size:22px;line-height:1;flex:none;padding-right:2px;transition:transform .2s}
-.link-field.open .link-chev{transform:rotate(-90deg)}
-.acc-picker{position:fixed;z-index:60;padding:12px 14px 14px;background:rgba(44,44,46,.97);backdrop-filter:blur(20px);border:1px solid var(--separator);border-radius:16px;box-shadow:0 12px 40px rgba(0,0,0,.5);max-height:min(56vh,400px);overflow-y:auto;animation:accPop .22s var(--bounce) backwards}
-@keyframes accPop{from{opacity:0;transform:translateY(10px) scale(.97)}to{opacity:1;transform:none}}
-.acc-picker[hidden]{display:none}
-.acc-close{margin-left:auto;background:none;border:0;color:var(--tint);font-size:14px;font-weight:600;padding:0}
-.acc-close:active{opacity:.5}
-.acc-pick-hint{display:flex;align-items:center;gap:10px;font-size:13px;color:var(--secondary);font-weight:600;margin:2px 0 12px}
-.acc-back{background:none;border:0;color:var(--tint);font-size:14px;padding:0;font-weight:600}
-.acc-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(88px,1fr));gap:10px}
-.acc-tile{display:flex;flex-direction:column;align-items:center;gap:6px;padding:12px 6px;border-radius:12px;background:rgba(255,255,255,.06);font-size:13px;text-align:center}
-.acc-tile:active{transform:scale(.95);background:rgba(255,255,255,.12)}
-.acc-tile .icon{width:38px;height:38px;border-radius:10px}
-.acc-tile small{font-size:11px;color:var(--tertiary)}
-.acc-list{display:flex;flex-direction:column;gap:2px}
-.acc-acc{display:flex;align-items:center;gap:10px;padding:9px 8px;border-radius:10px;text-align:left;background:none;border:0;color:inherit}
-.acc-acc.on{background:rgba(255,255,255,.08)}
-.acc-acc:active{opacity:.6}
-.acc-acc .icon{width:32px;height:32px;border-radius:8px;flex:none}
-.acc-acc-main{flex:1;min-width:0;display:flex;flex-direction:column;gap:1px}
-.acc-acc-main b{font-size:15px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.acc-acc-main small{font-size:12px;color:var(--tertiary)}
-.acc-acc .tick{color:var(--tint);font-weight:700;flex:none;width:16px;text-align:center}
-/* token 表单 hero 用通用 hero-icon，图标尺寸对齐账号 */
+.link-chev{color:var(--tertiary);font-size:22px;line-height:1;flex:none;padding-right:2px}
 #tokHero .hero-icon .icon{width:72px;height:72px;border-radius:17px}
-html[data-theme=light] .acc-picker{background:rgba(255,255,255,.98);box-shadow:0 -12px 40px rgba(0,0,0,.16)}
-html[data-theme=light] .acc-tile{background:#f2f2f7}
-html[data-theme=light] .acc-acc.on{background:rgba(0,0,0,.05)}
