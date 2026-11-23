@@ -2,6 +2,12 @@
 
 所有版本同时适用于网页版 / PWA 与 Scripting 打包版。
 
+## 1.0.3 - 2026-11-23
+
+- 修正 Scripting 配置中的 Logo 链接，使用指定的 GitHub Raw 地址
+- 修正菜单“下载”按钮，改为跳转 Toki 官方 Releases，不再跳转原项目
+- 更新网页静态资源缓存版本为 `toki-v10`
+
 ## 1.0.2 - 2026-11-23
 
 - 更换为新的 Toki Logo，并同步更新网页 favicon、PWA 图标和 Scripting 脚本图标

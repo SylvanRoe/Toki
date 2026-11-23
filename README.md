@@ -2,7 +2,7 @@
 <h1 align="center">Toki</h1>
 <p align="center">这个邮箱注册过什么？那个手机号绑了哪些 App？哪些账号正在使用哪些 Token？一眼看清。</p>
 <p align="center"><b>账号与 Token 管理 · 本地优先 · 网页 / PWA / Scripting</b></p>
-<p align="center"><b>当前版本：1.0.2</b></p>
+<p align="center"><b>当前版本：1.0.3</b></p>
 
 ---
 

@@ -1,6 +1,6 @@
 // Toki offline shell. HTML: network first (3 s), then cache. Same-origin assets: cache first, refreshed in background.
-const CACHE = 'toki-v9';
-const SHELL = ['./', './index.html', './manifest.webmanifest', './icon.png?v=toki9', './icon-512.png', './logo.svg?v=toki9', './tokens.js?v=toki9', './app.js?v=toki9', './styles.css?v=toki9'];
+const CACHE = 'toki-v10';
+const SHELL = ['./', './index.html', './manifest.webmanifest', './icon.png?v=toki10', './icon-512.png', './logo.svg?v=toki10', './tokens.js?v=toki10', './app.js?v=toki10', './styles.css?v=toki10'];
 self.addEventListener('install', e => { e.waitUntil(caches.open(CACHE).then(c => c.addAll(SHELL)).then(() => self.skipWaiting())); });
 self.addEventListener('activate', e => { e.waitUntil(caches.keys().then(ks => Promise.all(ks.filter(k => k !== CACHE).map(k => caches.delete(k)))).then(() => self.clients.claim())); });
 const put = (req, res) => { if (res && res.ok) { const c = res.clone(); caches.open(CACHE).then(x => x.put(req, c)); } return res; };

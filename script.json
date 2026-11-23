@@ -5,7 +5,7 @@
   },
   "icon": "point.3.connected.trianglepath.dotted",
   "color": "#0A84FF",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "runInApp": true,
   "iconImage": "https://raw.githubusercontent.com/SylvanRoe/Toki/main/web/icon-512.png",
   "description": "Toki account and token manager, bundled for offline use.",
