@@ -318,7 +318,8 @@
   }
   function tokenGroupSheet(accountId = '') {
     const account = accountId && allAccounts().find(a => a.id === accountId);
-    const tokens = list().filter(t => accountId ? t.accountId === accountId : !t.accountId).sort((a, b) => zh(a.name, b.name));
+    const validAccountIds = new Set(allAccounts().map(a => a.id));
+    const tokens = list().filter(t => accountId ? t.accountId === accountId : !t.accountId || !validAccountIds.has(t.accountId)).sort((a, b) => zh(a.name, b.name));
     const title = account ? `${accountName(account.id)} 的密钥` : '未关联密钥';
     ctx.openSheet(`<div class="sheet-bar"><button data-close>关闭</button><span class="t">${esc(title)}</span><button disabled></button></div>
       <div class="sheet-body form"><div class="token-group-summary"><b>${tokens.length}</b><span>条密钥</span></div>
