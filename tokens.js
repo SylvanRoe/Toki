@@ -7,6 +7,7 @@
   // 分类完全手填：以下是输入建议，不限制可选值
   const CAT_SUGGESTIONS = ['AI API', 'GitHub', '云服务', '数据库', '支付', 'OAuth', '其他'];
   const TOKEN_PRESETS = [
+    ['ChatGPT', 'chatgpt.com', 'AI API', '#10a37f'],
     ['OpenAI', 'openai.com', 'AI API', '#10a37f'],
     ['Anthropic / Claude', 'anthropic.com', 'AI API', '#d97757'],
     ['DeepSeek', 'deepseek.com', 'AI API', '#4d6bfe'],
@@ -57,7 +58,7 @@
     return s.slice(0, 4) + '••••••••' + s.slice(-4);
   }
   function expiryInfo(t) {
-    if (!t.expiresAt) return { text: '不过期', cls: '' };
+    if (!t.expiresAt) return { text: '无限期', cls: '' };
     const d = t.expiresAt - Date.now();
     if (d < 0) return { text: '已过期', cls: 'expired' };
     if (d < 7 * DAY) return { text: `${Math.ceil(d / DAY)} 天后到期`, cls: 'soon' };
@@ -84,6 +85,27 @@
   function allAccounts() {
     const s = getState();
     return Array.isArray(s?.accounts) ? s.accounts.slice().sort((a, b) => zh(a.name, b.name)) : [];
+  }
+  const normName = value => String(value || '').normalize('NFKC').trim().replace(/\s+/g, ' ').toLowerCase();
+  function accountPlatformOptions() {
+    const groups = new Map(), presets = ctx?.PRESETS || [];
+    for (const account of allAccounts()) {
+      const domain = normKey(account.domain), name = String(account.name || '').trim();
+      let preset = null;
+      if (domain) {
+        const matches = presets.filter(p => { const pd = normKey(p[1]); return pd && (domain === pd || domain.endsWith('.' + pd)); });
+        if (matches.length) preset = matches.sort((a, b) => normKey(b[1]).length - normKey(a[1]).length)[0];
+      } else preset = presets.find(p => normName(p[0]) === normName(name)) || null;
+      const key = preset ? `preset:${normKey(preset[1])}` : domain ? `domain:${domain}` : `name:${normName(name) || account.id}`;
+      let group = groups.get(key);
+      if (!group) {
+        group = { key, name: name || preset?.[0] || '未命名平台', domain: domain || preset?.[1] || '', category: account.category || preset?.[2] || '其他', color: ctx?.brand?.(account) || preset?.[3] || '#0a84ff', icon: account.icon || '', accounts: [] };
+        groups.set(key, group);
+      }
+      group.accounts.push(account);
+      if (!group.icon && account.icon) group.icon = account.icon;
+    }
+    return [...groups.values()].sort((a, b) => zh(a.name, b.name));
   }
   function accountName(id) { const a = allAccounts().find(x => x.id === id); return a ? a.name + (a.handle ? ' · ' + a.handle : '') : ''; }
   function platformAccounts(t = {}) {
@@ -146,7 +168,7 @@
   const ICON_EYE_OFF = '<svg viewBox="0 0 24 24"><path d="M3 3l18 18M10.6 6.2A9.9 9.9 0 0 1 12 6c5.9 0 9.5 6 9.5 6a15 15 0 0 1-3.1 3.7M6.5 7.6A15 15 0 0 0 2.5 12s3.6 6 9.5 6a9.7 9.7 0 0 0 4-.9"/><path d="M9.8 9.8a3 3 0 0 0 4.4 4.4"/></svg>';
   const ICON_EDIT = '<svg viewBox="0 0 24 24"><path d="M4 20h4l11-11-4-4L4 16v4ZM14.5 5.5l4 4"/></svg>';
 
-  const TOKEN_POPULAR = ['GitHub', 'OpenAI', 'Anthropic / Claude', 'DeepSeek', 'OpenRouter', 'Gemini', 'Cloudflare', 'Vercel', 'AWS', 'Supabase', 'Gitee', 'GitLab'];
+  const TOKEN_POPULAR = ['GitHub', 'ChatGPT', 'OpenAI', 'Anthropic / Claude', 'DeepSeek', 'OpenRouter', 'Gemini', 'Cloudflare', 'Vercel', 'AWS', 'Supabase', 'Gitee', 'GitLab'];
 
   function normalizeToken(t = {}, fresh = false) {
     const p = presetFor(t);
@@ -180,8 +202,8 @@
     d.domain = $('#tokDomain')?.value.trim() || '';
     d.category = $('#tokCategory')?.value.trim() || '其他';
     d.value = $('#tokValue')?.value.trim() || '';
-    const exp = $('#tokExpiry')?.value;
-    d.expiresAt = exp ? new Date(exp + 'T23:59:59').getTime() : 0;
+    const exp = $('#tokExpiry')?.value, expiryMode = $('#tokExpiryMode')?.value || (exp ? 'date' : 'never');
+    d.expiresAt = expiryMode === 'date' && exp ? new Date(exp + 'T23:59:59').getTime() : 0;
     d.notes = $('#tokNotes')?.value.trim() || '';
     return d;
   }
@@ -212,11 +234,12 @@
           <div class="field"><label>域名</label><input id="tokDomain" value="${esc(d.domain)}" placeholder="选填，用来获取平台图标" autocomplete="off"></div>
           <div class="field"><label>分类</label><input id="tokCategory" list="tokCatList" value="${esc(d.category)}" placeholder="手填分类，可自定义" autocomplete="off"><datalist id="tokCatList">${catOptions}</datalist></div>
           <div class="field"><label>密钥</label><input id="tokValue" type="password" value="${esc(d.value)}" placeholder="粘贴 Token / Key" autocomplete="off" spellcheck="false"></div>
-          <div class="field"><label>到期日</label><input id="tokExpiry" type="date" value="${d.expiresAt ? new Date(d.expiresAt).toISOString().slice(0, 10) : ''}"></div>
+          <div class="field"><label>有效期</label><select id="tokExpiryMode"><option value="never" ${d.expiresAt ? '' : 'selected'}>无限期</option><option value="date" ${d.expiresAt ? 'selected' : ''}>指定日期</option></select></div>
+          <div class="field tok-expiry-date" id="tokExpiryDateRow" ${d.expiresAt ? '' : 'hidden'}><label>到期日</label><input id="tokExpiry" type="date" value="${d.expiresAt ? new Date(d.expiresAt).toISOString().slice(0, 10) : ''}"></div>
           ${d.platform && accounts.length ? `<button class="field link-field ${selected ? 'linked' : ''}" id="tokAccountBtn"><label>使用账号</label><span class="link-val">${accountValue}</span><span class="link-chev">›</span></button>` : ''}
           <div class="field stack"><textarea id="tokNotes" placeholder="用途、权限范围…" spellcheck="false">${esc(d.notes)}</textarea></div>
         </div>
-        <p class="hint">到期日只作为提醒；没有可关联账号时，不显示“使用账号”。</p>
+        <p class="hint">有效期默认无限期；切换到指定日期后才会提醒。没有可关联账号时，不显示“使用账号”。</p>
         <div class="tok-form-actions"><button class="btn-filled" data-toksave="1">${ui.tokenEditing ? '保存修改' : '添加密钥'}</button>${ui.tokenEditing ? '<button class="btn-text destructive" data-tokdelete="' + esc(d.id) + '">删除</button>' : ''}</div>
       </div>`, { kind: 'token', id: d.id || '' });
     setTimeout(wireTokenEditor, 0);
@@ -228,6 +251,12 @@
     const acc = $('#tokAccountBtn'); if (acc) acc.onclick = () => { captureTokenDraft(); tokenAccountPicker(); };
     $('#tokName').addEventListener('input', e => { const h = $('#tokHeroTitle'); if (h) h.textContent = e.target.value.trim() || d.platform || '新密钥'; });
     $('#tokDomain')?.addEventListener('input', e => { d.domain = e.target.value.trim(); });
+    const expiryMode = $('#tokExpiryMode'), expiryRow = $('#tokExpiryDateRow'), expiryDate = $('#tokExpiry');
+    if (expiryMode) expiryMode.onchange = () => {
+      const dated = expiryMode.value === 'date'; expiryRow.hidden = !dated;
+      if (!dated) { expiryDate.value = ''; d.expiresAt = 0; }
+      else setTimeout(() => expiryDate.focus(), 30);
+    };
     $('#tokIconBtn').onclick = e => { e.stopPropagation(); $('#tokIconMenu').classList.toggle('open'); };
     $$('#tokIconMenu button').forEach(b => b.onclick = e => {
       e.stopPropagation(); $('#tokIconMenu').classList.remove('open');
@@ -251,23 +280,38 @@
     if (d.accountId && !platformAccounts(d).some(a => a.id === d.accountId)) d.accountId = '';
     renderTokenEditor();
   }
+  function chooseAccountPlatform(option) {
+    if (!option) return;
+    const d = ui.tokenDraft, accounts = option.accounts || [];
+    Object.assign(d, { platform: option.name, category: option.category || '其他', color: option.color || '#0a84ff', icon: option.icon || '' });
+    d['domain'] = option.domain || '';
+    if (!accounts.some(a => a.id === d.accountId)) d.accountId = accounts.length === 1 ? accounts[0].id : '';
+    renderTokenEditor();
+  }
 
   function tokenPlatformPicker(query = '') {
     const d = ui.tokenDraft; captureTokenDraft();
-    let q = query, cat = '常用';
-    const cats = ['常用', ...TOKEN_CATS.filter(c => TOKEN_PRESETS.some(p => p[2] === c))];
+    const existing = accountPlatformOptions();
+    let q = query, cat = existing.length ? '已有账号' : '常用';
+    const cats = [...(existing.length ? ['已有账号'] : []), '常用', ...TOKEN_CATS.filter(c => TOKEN_PRESETS.some(p => p[2] === c))];
     ctx.openSheet(`<div class="sheet-bar"><button id="tokPickBack">返回</button><span class="t">选择平台</span><button disabled></button></div>
-      <div class="pick-head"><div class="spot-field pk-field"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="6.5"/><path d="m20 20-4-4"/></svg><input id="tokPickQ" placeholder="搜索，或输入自定义平台" value="${esc(q)}" autocomplete="off" enterkeyhint="search"></div>
+      <div class="pick-head"><div class="spot-field pk-field"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="6.5"/><path d="m20 20-4-4"/></svg><input id="tokPickQ" placeholder="先选已有账号，或搜索其他平台" value="${esc(q)}" autocomplete="off" enterkeyhint="search"></div>
       <div class="filters pk-cats" id="tokPickCats">${cats.map(c => `<button data-tpc="${esc(c)}" class="${c === cat ? 'active' : ''}">${esc(c)}</button>`).join('')}</div></div>
       <div class="sheet-body"><div class="pick-grid" id="tokPickGrid"></div></div>`, { kind: 'token-platform' });
     const draw = () => {
-      const ql = q.trim().toLowerCase();
-      const list = ql ? TOKEN_PRESETS.filter(p => p[0].toLowerCase().includes(ql) || p[1].includes(ql))
-        : cat === '常用' ? TOKEN_POPULAR.map(n => byPreset(n)).filter(Boolean)
-        : TOKEN_PRESETS.filter(p => p[2] === cat);
-      const exact = ql && TOKEN_PRESETS.some(p => p[0].toLowerCase() === ql);
+      const ql = normName(q); let existingList = [], presetList = [];
+      if (ql) {
+        existingList = existing.filter(p => normName(p.name).includes(ql) || normKey(p.domain).includes(ql));
+        presetList = TOKEN_PRESETS.filter(p => normName(p[0]).includes(ql) || normKey(p[1]).includes(ql));
+      } else if (cat === '已有账号') existingList = existing;
+      else if (cat === '常用') presetList = TOKEN_POPULAR.map(n => byPreset(n)).filter(Boolean);
+      else presetList = TOKEN_PRESETS.filter(p => p[2] === cat);
+      const represented = new Set(existingList.flatMap(p => [`n:${normName(p.name)}`, ...(p.domain ? [`d:${normKey(p.domain)}`] : [])]));
+      presetList = presetList.filter(p => !represented.has(`n:${normName(p[0])}`) && !(p[1] && represented.has(`d:${normKey(p[1])}`)));
+      const exact = ql && (existing.some(p => normName(p.name) === ql) || TOKEN_PRESETS.some(p => normName(p[0]) === ql));
       $('#tokPickCats').style.display = ql ? 'none' : '';
-      $('#tokPickGrid').innerHTML = list.map(p => `<button class="pk" data-tplatform="${esc(p[0])}">${favicon({ platform: p[0], name: p[0], domain: p[1], color: p[3] })}<span>${esc(p[0])}</span><small>${esc(p[2])}</small></button>`).join('') +
+      $('#tokPickGrid').innerHTML = existingList.map(p => { const visual = { platform: p.name, name: p.name, color: p.color, icon: p.icon }; visual['domain'] = p.domain; return `<button class="pk" data-taccount-platform="${esc(p.key)}">${favicon(visual)}<span>${esc(p.name)}</span><small>已有账号 · ${p.accounts.length}</small></button>`; }).join('') +
+        presetList.map(p => `<button class="pk" data-tplatform="${esc(p[0])}">${favicon({ platform: p[0], name: p[0], domain: p[1], color: p[3] })}<span>${esc(p[0])}</span><small>${esc(p[2])}</small></button>`).join('') +
         (ql && !exact ? `<button class="pk custom" data-tcustom="${esc(q.trim())}"><span class="icon">＋</span><span>使用“${esc(q.trim())}”</span></button>` : '');
     };
     setTimeout(() => {
@@ -276,6 +320,8 @@
       $('#tokPickQ').addEventListener('input', e => { q = e.target.value; draw(); });
       $('#tokPickCats').onclick = e => { const b = e.target.closest('[data-tpc]'); if (!b) return; cat = b.dataset.tpc; $$('#tokPickCats button').forEach(x => x.classList.toggle('active', x === b)); draw(); $('.sheet-body')?.scrollTo(0, 0); };
       $('#tokPickGrid').onclick = e => {
+        const accountPlatform = e.target.closest('[data-taccount-platform]');
+        if (accountPlatform) return chooseAccountPlatform(existing.find(p => p.key === accountPlatform.dataset.taccountPlatform));
         const b = e.target.closest('[data-tplatform]'); if (b) return choosePlatform(byPreset(b.dataset.tplatform));
         const c = e.target.closest('[data-tcustom]'); if (c) choosePlatform([c.dataset.tcustom, '', '其他', '#0a84ff']);
       };
@@ -304,8 +350,10 @@
   }
 
   function readTokenForm() {
+    const expiryMode = $('#tokExpiryMode')?.value, expiryDate = $('#tokExpiry')?.value;
     const d = captureTokenDraft(); if (!d) return null;
     if (!d.platform) { toast('先选择平台'); return null; }
+    if (expiryMode === 'date' && !expiryDate) { $('#tokExpiry')?.focus(); toast('请选择到期日'); return null; }
     if (!d.name) { $('#tokName')?.focus(); toast('给这条密钥起个名字'); return null; }
     if (!d.value) { $('#tokValue')?.focus(); toast('请填写密钥'); return null; }
     return { ...d, id: ui.sheetTokenId || d.id || uid(), platform: d.platform, createdAt: d.createdAt || Date.now(), updatedAt: Date.now() };
