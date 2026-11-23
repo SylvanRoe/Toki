@@ -126,6 +126,15 @@
     localStorage.setItem(KEY, JSON.stringify(state));
     Sync.schedule();
   };
+  // 删除、导入或同步后，密钥不能继续指向已经不存在的账号。
+  function repairTokenLinks(target = state, touch = false) {
+    const accountIds = new Set((target.accounts || []).map(a => a.id));
+    let changed = false; const now = Date.now();
+    for (const token of (target.tokens || [])) if (token.accountId && !accountIds.has(token.accountId)) {
+      token.accountId = ''; if (touch) token.updatedAt = now; changed = true;
+    }
+    return changed;
+  }
 
   function demo() {
     const ids = [
@@ -1243,7 +1252,7 @@
         const d = JSON.parse(r.result);
         if (!Array.isArray(d.identities) || !Array.isArray(d.accounts)) throw 0;
         const tokens = Array.isArray(d.tokens) ? d.tokens.map(t => window.TokiTokens.normalize(t)) : [];
-        snap(); state = { identities: d.identities, accounts: d.accounts, tokens }; save(); render();
+        snap(); state = { identities: d.identities, accounts: d.accounts, tokens }; repairTokenLinks(state); save(); render();
         undoToast(`已导入 ${d.identities.length} 个身份、${d.accounts.length} 个网站和 ${tokens.length} 条密钥`);
       } catch { toast('这不是 Toki 的备份文件'); }
     };
@@ -1295,8 +1304,13 @@
       });
     }
     if (d.delAccount) {
-      const a = accById(d.delAccount);
-      return confirmSheet(`删除 ${a.name}？`, '只删除这条记录，不影响你在那个网站上的账号。', '删除', () => { snap(); state.accounts = state.accounts.filter(x => x.id !== a.id); save(); render(); undoToast('已删除'); });
+      const a = accById(d.delAccount), n = (state.tokens || []).filter(t => t.accountId === a.id).length;
+      const note = n ? `只删除这条账号记录；关联的 ${n} 条密钥会保留，并改为未关联。` : '只删除这条记录，不影响你在那个网站上的账号。';
+      return confirmSheet(`删除 ${a.name}？`, note, '删除', () => {
+        snap(); state.accounts = state.accounts.filter(x => x.id !== a.id);
+        (state.tokens || []).forEach(t => { if (t.accountId === a.id) t.accountId = ''; });
+        save(); render(); undoToast('已删除');
+      });
     }
     if (d.account) { if ($('#spotLayer').classList.contains('show')) closeSpot(); return showAccount(d.account); }
     if (d.identity) {
@@ -1348,23 +1362,28 @@
   // ---------- relationship map: identities on the left, apps on the right, threads between ----------
   const Graph = (() => {
     let sel = null, running = false, drawn = false, built = '', pre = 0;
-    const ROW = 64;
+    const ROW = 64, TOKEN_STEP = 48;
     function layout() {
       const TR = t => KINDS.indexOf(t);
       const ids = state.identities.filter(i => TR(i.type) >= 0).sort((p, q) => TR(p.type) - TR(q.type));
       const idx = id => ids.findIndex(i => i.id === id);
       const first = a => { const ks = a.identityIds.map(idx).filter(k => k >= 0); return ks.length ? Math.min(...ks) : 1e3; };
       const apps = state.accounts.slice().sort((a, b) => first(a) - first(b) || b.identityIds.length - a.identityIds.length || zh(a.name, b.name));
-      // 每个账号在第三列对应一个聚合密钥组；未关联密钥只占底部一个折叠行
-      const toksByAcc = {}, loose = [];
+      // 第三列逐条显示密钥。一个账号有多条密钥时扩大它的行，并从账号节点分别连出。
+      const toksByAcc = Object.create(null), loose = [];
       apps.forEach(a => toksByAcc[a.id] = []);
-      (state.tokens || []).forEach(t => { if (t.accountId && toksByAcc[t.accountId]) toksByAcc[t.accountId].push(t); else loose.push(t); });
+      (state.tokens || []).forEach(t => { if (t.accountId && Object.prototype.hasOwnProperty.call(toksByAcc, t.accountId)) toksByAcc[t.accountId].push(t); else loose.push(t); });
       Object.values(toksByAcc).forEach(list => list.sort((a, b) => zh(a.name, b.name)));
       loose.sort((a, b) => zh(a.name, b.name));
-      const ay = {}; let cursor = 0;
-      apps.forEach(a => { ay[a.id] = cursor + ROW / 2; cursor += ROW; });
-      const looseY = loose.length ? cursor + ROW / 2 : null;
-      if (loose.length) cursor += ROW;
+      const ay = {}, tokenYs = {}; let cursor = 0;
+      apps.forEach(a => {
+        const count = toksByAcc[a.id].length, block = Math.max(ROW, count * TOKEN_STEP);
+        ay[a.id] = cursor + block / 2;
+        tokenYs[a.id] = toksByAcc[a.id].map((_, k) => cursor + (block - (count - 1) * TOKEN_STEP) / 2 + k * TOKEN_STEP);
+        cursor += block;
+      });
+      const looseYs = loose.map((_, k) => cursor + TOKEN_STEP / 2 + k * TOKEN_STEP);
+      if (loose.length) cursor += Math.max(ROW, loose.length * TOKEN_STEP);
       const H = Math.max(cursor, ids.length * 78, 120);
       // each identity card sits at the middle of its apps, then nudge apart so cards never overlap
       let pos = ids.map(i => { const ys = accountsOf(i.id).map(a => ay[a.id]); return { i, y: ys.length ? ys.reduce((s, v) => s + v, 0) / ys.length : H }; });
@@ -1377,7 +1396,7 @@
       const over = pos.length ? pos[pos.length - 1].y - (H - half) : 0;
       if (over > 0) for (let k = pos.length - 1; k >= 0; k--) { pos[k].y = Math.min(pos[k].y, k === pos.length - 1 ? H - half : pos[k + 1].y - GAP - (brk.has(k + 1) ? LBL : 0)); pos[k].y = Math.max(pos[k].y, minY[k]); }
       const H2 = Math.max(H, pos.length ? pos[pos.length - 1].y + half : 0);
-      return { apps, ay, pos, H: H2, brk, toksByAcc, loose, looseY };
+      return { apps, ay, pos, H: H2, brk, toksByAcc, tokenYs, loose, looseYs };
     }
     function render() {
       const box = $('#mapBox'); if (!box) return;
@@ -1385,27 +1404,30 @@
       const ntok = (state.tokens || []).length;
       $('#graphSummary').textContent = n ? `${state.identities.length} 个身份，${n} 个网站与 App` + (ntok ? `，${ntok} 条密钥` : '') + (multi ? `，${multi} 个绑了不止一个` : '') : '';
       if (!state.identities.length || !n) { box.innerHTML = `<div class="empty"><h3>还没有可以连线的</h3><p>添加一个邮箱或手机号，再给它记几个网站，这里就会连起来。</p><button class="btn-filled" data-new="${state.identities.length ? 'account' : 'identity'}">${state.identities.length ? '添加网站或 App' : '添加邮箱或手机号'}</button></div>`; return; }
-      const { apps, ay, pos, H, brk, toksByAcc, loose, looseY } = layout();
+      const { apps, ay, pos, H, brk, toksByAcc, tokenYs, loose, looseYs } = layout();
       const W = box.clientWidth || 350, L = Math.min(124, Math.round(W * .29));
       const R = L + Math.max(46, Math.round(W * .12));
       const T = R + Math.max(92, Math.round(W * .27));
-      const AWW = Math.max(78, T - R - 10), TW = Math.max(0, W - T - 2);
-      const previewN = W >= 560 ? 4 : 2, paths = [], tpaths = [];
+      const COL_GAP = W >= 560 ? 30 : 22;
+      const AWW = Math.max(68, T - R - COL_GAP), TW = Math.max(0, W - T - 2);
+      const paths = [], tpaths = [];
       for (const p of pos) for (const a of accountsOf(p.i.id)) {
         const y1 = p.y, y2 = ay[a.id], mx = (L + R) / 2;
         paths.push(`<path data-i="${p.i.id}" data-a="${a.id}" style="--c:${p.i.color}" d="M${L} ${y1.toFixed(1)}C${mx} ${y1.toFixed(1)} ${mx} ${y2.toFixed(1)} ${R - 6} ${y2.toFixed(1)}"/>`);
       }
-      for (const a of apps) if (toksByAcc[a.id].length) {
-        const y = ay[a.id], mx = (R + AWW + T) / 2, c = toksByAcc[a.id][0].color || '#0a84ff';
-        tpaths.push(`<path class="tok-thread" data-a="${a.id}" style="--c:${c}" d="M${R + AWW} ${y.toFixed(1)}C${mx} ${y.toFixed(1)} ${mx} ${y.toFixed(1)} ${T - 6} ${y.toFixed(1)}"/>`);
+      for (const a of apps) {
+        const y1 = ay[a.id], x1 = R + AWW, x2 = T + 1, mx = (x1 + x2) / 2, c = brand(a);
+        toksByAcc[a.id].forEach((t, k) => {
+          const y2 = tokenYs[a.id][k];
+          tpaths.push(`<path class="tok-thread" data-a="${a.id}" data-t="${t.id}" style="--c:${c}" d="M${x1} ${y1.toFixed(1)}C${mx} ${y1.toFixed(1)} ${mx} ${y2.toFixed(1)} ${x2} ${y2.toFixed(1)}"/>`);
+        });
       }
       const stateDot = t => { const d = Number(t.expiresAt) - Date.now(); return t.expiresAt ? (d < 0 ? 'expired' : d < 7 * 864e5 ? 'soon' : '') : ''; };
-      const tokenGroup = (list, y, accountId = '') => {
-        if (!list.length) return '';
-        const shown = list.slice(0, previewN), more = list.length - shown.length, states = list.map(stateDot);
-        const groupState = states.includes('expired') ? 'expired' : states.includes('soon') ? 'soon' : '';
-        return `<button class="mtok-group ${accountId ? '' : 'unlinked'} ${groupState}" data-map-token-group="${esc(accountId)}" style="top:${y - 27}px;left:${T}px;width:${TW}px;--c:${esc(list[0].color || '#0a84ff')}">
-          <span class="mtg-key">${ICON.login}</span><span class="mtg-main"><span class="mtg-title"><i class="mtg-state ${groupState}"></i>${accountId ? `${list.length} 条密钥` : `未关联密钥 · ${list.length}`}</span><span class="mtg-names">${shown.map(t => `<b><i class="${stateDot(t)}"></i>${esc(t.name || '未命名密钥')}</b>`).join('')}${more ? `<em>+${more}</em>` : ''}</span></span><span class="link-chev">›</span></button>`;
+      const tokenNode = (t, y, account = null) => {
+        const tokenState = stateDot(t), c = account ? brand(account) : (t.color || '#0a84ff');
+        const platform = t.platform || t.domain || (account ? account.name : '自定义平台');
+        return `<button class="mtok-group ${account ? '' : 'unlinked'} ${tokenState}" data-map-token="${esc(t.id)}" data-map-token-account="${esc(account?.id || '')}" style="top:${y - 21}px;left:${T}px;width:${TW}px;--c:${esc(c)}" aria-label="${esc(t.name || '未命名密钥')}">
+          <span class="mtg-key">${ICON.login}</span><span class="mtg-main"><span class="mtg-title"><i class="mtg-state ${tokenState}"></i>${esc(t.name || '未命名密钥')}</span><span class="mtg-names"><b><i class="${tokenState}"></i>${esc(platform)}</b></span></span><span class="link-chev">›</span></button>`;
       };
       box.style.height = H + 'px';
       box.innerHTML = `<svg class="threads" viewBox="0 0 ${W} ${H}" style="width:${W}px;height:${H}px" aria-hidden="true">${paths.join('')}${tpaths.join('')}</svg>
@@ -1414,9 +1436,9 @@
         <span class="mcol-head" style="left:${T}px;width:${TW}px">密钥</span>
         ${pos.map((p, k) => (k === 0 || brk.has(k)) ? `<span class="mgroup" style="top:${p.y - 31 - 24}px;width:${L}px">${p.i.type === 'phone' ? ICON.phone + '手机号' : p.i.type === 'login' ? ICON.login + '登录' : ICON.email + '邮箱'}</span>` : '').join('')}
         ${pos.map(p => { const c = accountsOf(p.i.id).length; return `<button class="mcard" data-map-identity="${p.i.id}" style="top:${p.y - 31}px;width:${L}px;--c:${p.i.color};--g:${skin(p.i.color)}"><span class="mk">${idGlyph(p.i)}<b>${c}</b></span><span class="mv">${esc(p.i.label || display(p.i))}</span>${p.i.label ? `<span class="ms">${esc(display(p.i))}</span>` : ''}</button>`; }).join('')}
-        ${apps.map(a => `<button class="mapp ${a.identityIds.length ? '' : 'loose'}" data-account="${a.id}" style="top:${ay[a.id] - 27}px;left:${R}px;width:${AWW}px">${favIcon(a)}<span class="mn">${esc(a.name)}${handle(a)}</span>${a.identityIds.length > 1 ? `<span class="mdots">${a.identityIds.map(idById).filter(Boolean).map(i => `<i style="--c:${i.color}"></i>`).join('')}</span>` : ''}</button>`).join('')}
-        ${apps.map(a => tokenGroup(toksByAcc[a.id], ay[a.id], a.id)).join('')}
-        ${looseY ? tokenGroup(loose, looseY, '') : ''}`;
+        ${apps.map(a => `<button class="mapp ${a.identityIds.length ? '' : 'loose'}" data-account="${a.id}" style="top:${ay[a.id] - 27}px;left:${R}px;width:${AWW}px;--c:${brand(a)}">${favIcon(a)}<span class="mn">${esc(a.name)}${handle(a)}</span>${a.identityIds.length > 1 ? `<span class="mdots">${a.identityIds.map(idById).filter(Boolean).map(i => `<i style="--c:${i.color}"></i>`).join('')}</span>` : ''}</button>`).join('')}
+        ${apps.map(a => toksByAcc[a.id].map((t, k) => tokenNode(t, tokenYs[a.id][k], a)).join('')).join('')}
+        ${loose.map((t, k) => tokenNode(t, looseYs[k], null)).join('')}`;
       built = dataVer + ':' + W;
       apply(); if (running) draw();
     }
@@ -1424,7 +1446,7 @@
     function draw() {
       if (drawn) return; drawn = true;
       // wait two frames so the tab is actually visible (content-visibility) before the threads start drawing
-      const ps = $$('#mapBox .threads path');
+      const ps = $$('#mapBox .threads path:not(.tok-thread)');
       ps.forEach(p => { const len = p._len || (p._len = Math.ceil(p.getTotalLength()) + 2); p.style.strokeDasharray = `${len}px ${len}px`; p.style.strokeDashoffset = `${len}px`; });   // hidden until the draw starts, no flash
       requestAnimationFrame(() => requestAnimationFrame(() => { ps.forEach((p, k) => { const len = p._len; p.style.strokeDasharray = p.style.strokeDashoffset = ''; if (!running) return; p.animate([{ strokeDasharray: `${len}px ${len}px`, strokeDashoffset: `${len}px` }, { strokeDasharray: `${len}px ${len}px`, strokeDashoffset: '0px' }], { duration: 700, delay: 60 + Math.min(k, 20) * 18, easing: 'cubic-bezier(.32,.72,0,1)', fill: 'backwards' }); }); }));
     }
@@ -1436,12 +1458,12 @@
       $$('.threads path.tok-thread', box).forEach(p => p.classList.toggle('on', linked.has(p.dataset.a)));
       $$('.mcard', box).forEach(c => c.classList.toggle('on', c.dataset.mapIdentity === sel));
       $$('.mapp', box).forEach(c => c.classList.toggle('on', linked.has(c.dataset.account)));
-      $$('.mtok-group', box).forEach(c => c.classList.toggle('on', linked.has(c.dataset.mapTokenGroup)));
+      $$('.mtok-group', box).forEach(c => c.classList.toggle('on', linked.has(c.dataset.mapTokenAccount)));
     }
     document.addEventListener('click', e => {
       if (ui.tab !== 'graph' || e.target.closest('.sheet,.menu,#tabbar,.top')) return;
-      const tg = e.target.closest('[data-map-token-group]');
-      if (tg) { window.TokiTokens?.showGroup?.(tg.dataset.mapTokenGroup || ''); return; }
+      const tok = e.target.closest('[data-map-token]');
+      if (tok) { window.TokiTokens?.edit?.(tok.dataset.mapToken); return; }
       const c = e.target.closest('[data-map-identity]');
       if (c) { const id = c.dataset.mapIdentity; if (sel === id) showIdentity(id); else { sel = id; apply(); } return; }
       if (!e.target.closest('.mapp') && sel) { sel = null; apply(); }
@@ -1528,9 +1550,10 @@
       }
       for (const id of Object.keys(del)) if (DATA_ARRAYS.some(k => out[k].some(x => x.id === id))) delete del[id];
       out.identities.sort((x, y) => (x.order ?? 1e9) - (y.order ?? 1e9));
-      // drop links to identities that no longer exist
+      // drop links to identities/accounts that no longer exist
       const ids = new Set(out.identities.map(i => i.id));
       out.accounts.forEach(x => { x.identityIds = x.identityIds.filter(i => ids.has(i)); });
+      repairTokenLinks(out, true);
       // forget tombstones older than 90 days
       const old = Date.now() - 90 * DAY; for (const [id, t] of Object.entries(del)) if (t < old) delete del[id];
       return out;
@@ -1676,8 +1699,11 @@
   });
 
   // ---------- boot ----------
-  if (state) remember();
-  if (state && !Array.isArray(state.tokens)) state.tokens = [];
+  if (state) {
+    if (!Array.isArray(state.tokens)) state.tokens = [];
+    remember();
+    if (repairTokenLinks(state)) save();
+  }
   if (!state) {
     state = demo(); save();
     setTimeout(() => toast('这是示例数据', { label: '清空', fn: () => { state = { identities: [], accounts: [], tokens: [] }; save(); render(); } }), 1400);
