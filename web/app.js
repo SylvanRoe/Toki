@@ -126,6 +126,7 @@
     localStorage.setItem(KEY, JSON.stringify(state));
     Sync.schedule();
   };
+
   // 删除、导入或同步后，密钥不能继续指向已经不存在的账号。
   function repairTokenLinks(target = state, touch = false) {
     const accountIds = new Set((target.accounts || []).map(a => a.id));
