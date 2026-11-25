@@ -1,34 +1,34 @@
 {
+  "permissions" : null,
   "contributors" : [
 
   ],
-  "permissions" : null,
-  "remoteDefinitionId" : null,
-  "description" : "Toki account and token manager, bundled for offline use.",
-  "localizedNames" : {
-    "zh" : "Toki"
-  },
-  "entry" : "index.tsx",
-  "color" : "#2C2C2E",
-  "runInApp" : true,
-  "version" : "1.0.8",
+  "icon" : "point.3.connected.trianglepath.dotted",
   "iconImage" : "https:\/\/raw.githubusercontent.com\/SylvanRoe\/Toki\/main\/web\/icon-512.png?v=2",
+  "runInApp" : true,
+  "description" : "Toki account and token manager, bundled for offline use.",
+  "version" : "1.0.9",
+  "entry" : "index.tsx",
   "localizedDescriptions" : {
     "zh" : "原样打包的 Toki 账号与密钥管理应用，支持离线使用"
   },
-  "name" : "Toki",
-  "author" : {
-    "name" : "SylvanRoe",
-    "homepage" : "https:\/\/github.com\/SylvanRoe\/Toki",
-    "email" : null
-  },
+  "color" : "#2C2C2E",
   "intentInputTypes" : [
 
   ],
-  "icon" : "point.3.connected.trianglepath.dotted",
+  "remoteDefinitionId" : null,
+  "name" : "Toki",
   "remoteResource" : {
-    "autoUpdateInterval" : 3600,
-    "hash" : "591aaa898b665379d7895f4ea864ee92",
-    "url" : "https:\/\/github.com\/SylvanRoe\/Toki\/raw\/refs\/heads\/main\/Toki.scripting"
+    "hash" : "18b51f4012046f63dfb77ab44360b234",
+    "url" : "https:\/\/github.com\/SylvanRoe\/Toki\/raw\/refs\/heads\/main\/Toki.scripting",
+    "autoUpdateInterval" : 3600
+  },
+  "localizedNames" : {
+    "zh" : "Toki"
+  },
+  "author" : {
+    "homepage" : "https:\/\/github.com\/SylvanRoe\/Toki",
+    "name" : "SylvanRoe",
+    "email" : null
   }
 }

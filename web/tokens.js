@@ -3,9 +3,10 @@
 (() => {
   'use strict';
 
-  const TOKEN_CATS = ['AI API', 'GitHub', '云服务', '数据库', '支付', 'OAuth', '其他'];
+  const TOKEN_CATS = ['未分类', 'AI API', 'GitHub', '云服务', '数据库', '支付', 'OAuth', '其他'];
   // 分类完全手填：以下是输入建议，不限制可选值
-  const CAT_SUGGESTIONS = ['AI API', 'GitHub', '云服务', '数据库', '支付', 'OAuth', '其他'];
+  // 未分类是默认归类；分类进列表点选，自定义走手填
+  const CAT_SUGGESTIONS = ['未分类', 'AI API', 'GitHub', '云服务', '数据库', '支付', 'OAuth', '其他'];
   const TOKEN_PRESETS = [
     ['ChatGPT', 'chatgpt.com', 'AI API', '#10a37f'],
     ['OpenAI', 'openai.com', 'AI API', '#10a37f'],
@@ -99,7 +100,7 @@
       const key = preset ? `preset:${normKey(preset[1])}` : domain ? `domain:${domain}` : `name:${normName(name) || account.id}`;
       let group = groups.get(key);
       if (!group) {
-        group = { key, name: name || preset?.[0] || '未命名平台', domain: domain || preset?.[1] || '', category: account.category || preset?.[2] || '其他', color: ctx?.brand?.(account) || preset?.[3] || '#0a84ff', icon: account.icon || '', accounts: [] };
+        group = { key, name: name || preset?.[0] || '未命名平台', domain: domain || preset?.[1] || '', category: account.category || preset?.[2] || '未分类', color: ctx?.brand?.(account) || preset?.[3] || '#0a84ff', icon: account.icon || '', accounts: [] };
         groups.set(key, group);
       }
       group.accounts.push(account);
@@ -126,9 +127,10 @@
     if (!root) return;
     const tokens = list();
     const counts = {};
-    tokens.forEach(t => { const c = t.category || '其他'; counts[c] = (counts[c] || 0) + 1; });
-    // 包含手填的自定义分类
-    const cats = [...CATS.filter(c => counts[c]), ...Object.keys(counts).filter(c => !CATS.includes(c)).sort(zh)];
+    tokens.forEach(t => { const c = t.category || '未分类'; counts[c] = (counts[c] || 0) + 1; });
+    // 分类可增删改：以持久化列表为准，合并仍在用的分类
+    const defined = ctx?.loadCats?.('token', TOKEN_CATS) || CATS;
+    const cats = [...defined.filter(c => counts[c]), ...Object.keys(counts).filter(c => !defined.includes(c)).sort(zh)];
     if (ui.cat !== '全部' && !counts[ui.cat]) ui.cat = '全部';
     const filters = $('#tokenFilters');
     if (filters) filters.innerHTML = ['全部', ...cats].map(c => `<button class="${c === ui.cat ? 'active' : ''}" data-tokcat="${esc(c)}">${esc(c)}${c === '全部' ? ` <small>${tokens.length}</small>` : ` <small>${counts[c]}</small>`}</button>`).join('');
@@ -152,7 +154,7 @@
         <div class="tok-main">
           <div class="tok-head"><span class="tok-title">${esc(t.name || `${platform} 密钥`)}</span><span class="tok-cat">${esc(platform)}</span></div>
           <div class="tok-value ${revealed ? 'revealed' : ''}">${revealed ? esc(t.value) : esc(maskValue(t.value))}</div>
-          <div class="tok-meta">${t.accountId && accountName(t.accountId) ? `<span class="tok-acc">${esc(accountName(t.accountId))}</span> · ` : ''}${esc(t.category || '其他')} · <span class="${ex.cls}">${ex.text}</span>${t.notes ? ' · ' + esc(t.notes.slice(0, 24)) : ''}</div>
+          <div class="tok-meta">${t.accountId && accountName(t.accountId) ? `<span class="tok-acc">${esc(accountName(t.accountId))}</span> · ` : ''}${esc(t.category || '未分类')} · <span class="${ex.cls}">${ex.text}</span>${t.notes ? ' · ' + esc(t.notes.slice(0, 24)) : ''}</div>
         </div>
         <div class="tok-actions">
           <button data-tokcopy="${t.id}" aria-label="复制">${ICON_COPY}</button>
@@ -178,7 +180,7 @@
       platform,
       name: t.name || (fresh ? '' : '未命名密钥'),
       domain: t.domain || p?.[1] || '',
-      category: t.category || p?.[2] || '其他',
+      category: t.category || p?.[2] || '未分类',
       color: t.color || p?.[3] || '#0a84ff',
       value: t.value || '', notes: t.notes || '', accountId: t.accountId || '', icon: t.icon || '',
       expiresAt: Number(t.expiresAt) || 0,
@@ -200,7 +202,8 @@
     const d = ui.tokenDraft; if (!d || !$('#tokName')) return d;
     d.name = $('#tokName').value.trim();
     d.domain = $('#tokDomain')?.value.trim() || '';
-    d.category = $('#tokCategory')?.value.trim() || '其他';
+    // 分类由分类选择列表写入 draft，这里只做兜底
+    if (!d.category) d.category = '未分类';
     d.value = $('#tokValue')?.value.trim() || '';
     const exp = $('#tokExpiry')?.value, expiryMode = $('#tokExpiryMode')?.value || (exp ? 'date' : 'never');
     d.expiresAt = expiryMode === 'date' && exp ? new Date(exp + 'T23:59:59').getTime() : 0;
@@ -212,7 +215,8 @@
     const d = ui.tokenDraft; if (!d) return;
     const accounts = platformAccounts(d), selected = d.accountId && allAccounts().find(a => a.id === d.accountId);
     if (selected && !accounts.some(a => a.id === selected.id)) accounts.push(selected);
-    const catOptions = CAT_SUGGESTIONS.map(c => `<option value="${esc(c)}"></option>`).join('');
+    // 分类：点击进列表选择，可选自定义
+    const catValue = d.category ? `<span>${esc(d.category)}</span>` : '<em>未分类</em>';
     const platformValue = d.platform ? `${favicon(d)}<span>${esc(d.platform)}</span>` : '<em>选择平台</em>';
     const accountValue = selected ? `${favicon(selected)}<span>${esc(accountName(selected.id))}</span>` : `<em>选择${esc(d.platform)}账号</em>`;
     ctx.openSheet(`<div class="sheet-bar"><button data-close>取消</button><span class="t">${ui.tokenEditing ? '编辑密钥' : '添加密钥'}</span><button id="tokSaveTop" class="tok-save-top">保存</button></div>
@@ -232,7 +236,7 @@
         <div class="sec-title">详细信息</div>
         <div class="group">
           <div class="field"><label>域名</label><input id="tokDomain" value="${esc(d.domain)}" placeholder="选填，用来获取平台图标" autocomplete="off"></div>
-          <div class="field"><label>分类</label><input id="tokCategory" list="tokCatList" value="${esc(d.category)}" placeholder="手填分类，可自定义" autocomplete="off"><datalist id="tokCatList">${catOptions}</datalist></div>
+          <button type="button" class="field link-field ${d.category ? 'linked' : ''}" id="tokCatBtn"><label>分类</label><span class="link-val">${catValue}</span><span class="link-chev">›</span></button>
           <div class="field"><label>密钥</label><input id="tokValue" type="password" value="${esc(d.value)}" placeholder="粘贴 Token / Key" autocomplete="off" spellcheck="false"></div>
           <div class="field"><label>有效期</label><select id="tokExpiryMode"><option value="never" ${d.expiresAt ? '' : 'selected'}>无限期</option><option value="date" ${d.expiresAt ? 'selected' : ''}>指定日期</option></select></div>
           <div class="field tok-expiry-date" id="tokExpiryDateRow" ${d.expiresAt ? '' : 'hidden'}><label>到期日</label><input id="tokExpiry" type="date" value="${d.expiresAt ? new Date(d.expiresAt).toISOString().slice(0, 10) : ''}"></div>
@@ -249,6 +253,10 @@
     const d = ui.tokenDraft; if (!d) return;
     $('#tokPlatformBtn').onclick = () => { captureTokenDraft(); tokenPlatformPicker(); };
     const acc = $('#tokAccountBtn'); if (acc) acc.onclick = () => { captureTokenDraft(); tokenAccountPicker(); };
+    $('#tokCatBtn').onclick = () => {
+      captureTokenDraft();
+      ctx.showCategoryDialog?.('token', d.category, c => { d.category = c; renderTokenEditor(); }, () => renderTokens());
+    };
     $('#tokName').addEventListener('input', e => { const h = $('#tokHeroTitle'); if (h) h.textContent = e.target.value.trim() || d.platform || '新密钥'; });
     $('#tokDomain')?.addEventListener('input', e => { d.domain = e.target.value.trim(); });
     const expiryMode = $('#tokExpiryMode'), expiryRow = $('#tokExpiryDateRow'), expiryDate = $('#tokExpiry');
@@ -276,14 +284,14 @@
 
   function choosePlatform(p) {
     const d = ui.tokenDraft;
-    Object.assign(d, { platform: p[0], domain: p[1] || '', category: p[2] || '其他', color: p[3] || '#0a84ff', icon: '' });
+    Object.assign(d, { platform: p[0], domain: p[1] || '', category: p[2] || '未分类', color: p[3] || '#0a84ff', icon: '' });
     if (d.accountId && !platformAccounts(d).some(a => a.id === d.accountId)) d.accountId = '';
     renderTokenEditor();
   }
   function chooseAccountPlatform(option) {
     if (!option) return;
     const d = ui.tokenDraft, accounts = option.accounts || [];
-    Object.assign(d, { platform: option.name, category: option.category || '其他', color: option.color || '#0a84ff', icon: option.icon || '' });
+    Object.assign(d, { platform: option.name, category: option.category || '未分类', color: option.color || '#0a84ff', icon: option.icon || '' });
     d['domain'] = option.domain || '';
     if (!accounts.some(a => a.id === d.accountId)) d.accountId = accounts.length === 1 ? accounts[0].id : '';
     renderTokenEditor();
@@ -323,7 +331,7 @@
         const accountPlatform = e.target.closest('[data-taccount-platform]');
         if (accountPlatform) return chooseAccountPlatform(existing.find(p => p.key === accountPlatform.dataset.taccountPlatform));
         const b = e.target.closest('[data-tplatform]'); if (b) return choosePlatform(byPreset(b.dataset.tplatform));
-        const c = e.target.closest('[data-tcustom]'); if (c) choosePlatform([c.dataset.tcustom, '', '其他', '#0a84ff']);
+        const c = e.target.closest('[data-tcustom]'); if (c) choosePlatform([c.dataset.tcustom, '', '未分类', '#0a84ff']);
       };
       if (q) $('#tokPickQ').focus();
     }, 0);

@@ -11,10 +11,10 @@
   <meta name="description" content="账号关系与 API Token 管理，一眼看清" />
   <title>Toki · 账号与密钥</title>
   <script>try{if(localStorage.getItem("atlas.theme")==="light"){document.documentElement.dataset.theme="light";document.querySelector('meta[name="apple-mobile-web-app-status-bar-style"]').content="default";document.querySelector('meta[name="theme-color"]').content="#f2f2f7"}}catch(e){}</script>
-  <link rel="icon" href="logo.svg?v=toki11" type="image/svg+xml" />
+  <link rel="icon" href="logo.svg?v=toki12" type="image/svg+xml" />
   <link rel="manifest" href="manifest.webmanifest" />
-  <link rel="apple-touch-icon" href="icon.png?v=toki11" />
-  <link rel="stylesheet" href="styles.css?v=toki11" />
+  <link rel="apple-touch-icon" href="icon.png?v=toki12" />
+  <link rel="stylesheet" href="styles.css?v=toki12" />
 </head>
 <body>
   <div class="glow" id="glow"></div>
@@ -82,8 +82,8 @@
     <!-- 关系图 -->
     <section class="view" data-view="graph">
       <div class="hello"><h1 class="large">关系图</h1><p class="summary" id="graphSummary"></p></div>
-      <div class="map" id="mapBox"></div>
-      <p class="map-tip" id="mapTip">点一张卡片，只看它连着的；再点一下打开详情。</p>
+      <div class="map-scroll" id="mapScroll"><div class="map" id="mapBox"></div></div>
+      <p class="map-tip" id="mapTip">点一张卡片，只看它连着的；左右滑动查看完整关系图。</p>
     </section>
 
     <p class="footnote" id="footnote"></p>
@@ -111,10 +111,18 @@
     </div>
   </div>
 
+  <div class="cat-dialog-layer" id="catDialogLayer">
+    <div class="cat-dialog" id="catDialog" role="dialog" aria-modal="true">
+      <div class="cat-dialog-head"><button class="cat-dialog-mgmt" id="catDialogManage">管理</button><b id="catDialogTitle">选择分类</b><button id="catDialogClose" aria-label="取消">✕</button></div>
+      <div class="cat-dialog-list" id="catDialogList"></div>
+      <div class="cat-dialog-custom" id="catDialogCustomRow" hidden><input id="catDialogInput" placeholder="输入分类名称" autocomplete="off" /><button id="catDialogOk">确定</button></div>
+    </div>
+  </div>
+
   <div class="toast" id="toast"></div>
   <input type="file" id="fileInput" accept="application/json" hidden />
-  <script src="tokens.js?v=toki11"></script>
-  <script src="app.js?v=toki11"></script>
+  <script src="tokens.js?v=toki12"></script>
+  <script src="app.js?v=toki12"></script>
 <script>if("serviceWorker" in navigator&&location.protocol.startsWith("http"))addEventListener("load",()=>navigator.serviceWorker.register("sw.js"));</script>
 </body>
 </html>
