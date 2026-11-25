@@ -38,6 +38,8 @@
   const typeName = i => i.type === 'login' ? LOGIN[provOf(i)].name : i.type === 'phone' ? '手机号' : '邮箱';
   const skin = c => `linear-gradient(145deg, ${SKINS[c] ? SKINS[c][1] : `color-mix(in srgb, ${c} 70%, #fff) 0%, ${c} 50%, color-mix(in srgb, ${c} 70%, #000) 100%`})`;
   const CATS = ['社交', '购物', '支付金融', '开发', 'AI', '娱乐', '游戏', '出行', '工具', '加密', '其他'];
+  // 表单分类预设：未分类为默认值
+  const CAT_PICK = ['未分类', ...CATS];
   // name, domain, category, brand colour
   const PRESETS = [
     ['微信', 'weixin.qq.com', '社交', '#07c160'], ['QQ', 'qq.com', '社交', '#12b7f5'], ['微博', 'weibo.com', '社交', '#e6162d'], ['小红书', 'xiaohongshu.com', '社交', '#ff2442'],
@@ -73,6 +75,19 @@
   // apps the user typed in by hand are remembered and show up in the picker
   const isPreset = n => PRESETS.some(p => p[0].toLowerCase() === n.toLowerCase());
   const readList = k => { try { const v = JSON.parse(localStorage.getItem(k) || '[]'); return Array.isArray(v) ? v : []; } catch (e) { return []; } };
+  // 可编辑的分类列表（账号与密钥各一套），持久化到本地；「未分类」固定不可删
+  const CAT_STORE = { account: 'atlas.cats.account', token: 'atlas.cats.token' };
+  function loadCats(scope, defaults) {
+    const k = CAT_STORE[scope]; const def = defaults.slice();
+    if (!k) return def;
+    const raw = localStorage.getItem(k);
+    if (raw == null) { try { localStorage.setItem(k, JSON.stringify(def)); } catch (e) {} return def; }
+    try { const a = JSON.parse(raw); if (Array.isArray(a) && a.length) return a.includes('未分类') ? a : ['未分类', ...a.filter(x => x !== '未分类')]; } catch (e) {}
+    return def;
+  }
+  function storeCats(scope, list) {
+    const k = CAT_STORE[scope]; if (k) try { localStorage.setItem(k, JSON.stringify(list)); } catch (e) {}
+  }
   // apps removed from 我添加的 (lowercase names); local only, not synced
   const hiddenApps = () => new Set(readList('atlas.custom.hidden').map(x => String(x).toLowerCase()));
   function myApps() {
@@ -126,6 +141,7 @@
     localStorage.setItem(KEY, JSON.stringify(state));
     Sync.schedule();
   };
+
   // 删除、导入或同步后，密钥不能继续指向已经不存在的账号。
   function repairTokenLinks(target = state, touch = false) {
     const accountIds = new Set((target.accounts || []).map(a => a.id));
@@ -299,7 +315,7 @@
   let toastTimer;
   function toast(msg, action) {
     const t = $('#toast');
-    t.innerHTML = `<img class="ti" src="icon.png?v=4" alt=""><span class="tx"><span class="tn">Toki</span><span class="tt">${esc(msg)}</span></span>${action ? `<button>${esc(action.label)}</button>` : ''}`;
+    t.innerHTML = `<img class="ti" src="icon.png?v=toki12" alt=""><span class="tx"><span class="tn">Toki</span><span class="tt">${esc(msg)}</span></span>${action ? `<button>${esc(action.label)}</button>` : ''}`;
     if (action) t.querySelector('button').onclick = () => { action.fn(); t.classList.remove('show'); };
     t.classList.add('show');
     clearTimeout(toastTimer); toastTimer = setTimeout(() => t.classList.remove('show'), action ? 4500 : 2200);
@@ -346,7 +362,7 @@
     renderSeg();
     w.innerHTML = d.map(i => walletCard(i)).join('') +
       (state.identities.length ? `<button class="wcard ghost ${ui.kind === 'phone' ? 'sim' : ''}" data-new="identity" data-type="${ui.kind}"><div>${ICON.plus}添加${word}</div></button>`
-        : `<button class="wcard ghost first" data-new="identity"><img src="icon.png?v=4" alt=""><b>从一个邮箱或手机号开始</b><span>每张卡片记着它注册、绑定过的网站与 App</span><em>${ICON.plus}添加</em></button>`);
+        : `<button class="wcard ghost first" data-new="identity"><img src="icon.png?v=toki12" alt=""><b>从一个邮箱或手机号开始</b><span>每张卡片记着它注册、绑定过的网站与 App</span><em>${ICON.plus}添加</em></button>`);
     fixStack(w);
     $('#dots').innerHTML = [...d, 0].map((_, k) => `<i class="${k === ui.active ? 'on' : ''}"></i>`).join('');
     ui.active = Math.min(ui.active, d.length);
@@ -510,9 +526,10 @@
     const v = $('#siteList');
     if (!state.accounts.length) { v.innerHTML = `<div class="empty"><h3>还没有网站</h3><p>记下一个网站或 App，选上它用的是哪个邮箱、哪个手机号。</p><button class="btn-filled" data-new="account">添加网站或 App</button></div>`; $('#filters').innerHTML = ''; return; }
     const counts = {};
-    state.accounts.forEach(a => { const c = a.category || '其他'; counts[c] = (counts[c] || 0) + 1; });
-    // 自定义分类按预设顺序排前，其余按名称补充，确保手填分类也能显示
-    const cats = [...CATS.filter(c => counts[c]), ...Object.keys(counts).filter(c => !CATS.includes(c)).sort(zh)];
+    state.accounts.forEach(a => { const c = a.category || '未分类'; counts[c] = (counts[c] || 0) + 1; });
+    // 分类可增删改：以持久化列表为准，合并仍在用的分类
+    const defined = loadCats('account', CAT_PICK);
+    const cats = [...defined.filter(c => counts[c]), ...Object.keys(counts).filter(c => !defined.includes(c)).sort(zh)];
     if (ui.cat !== '全部' && !counts[ui.cat]) ui.cat = '全部';
     $('#filters').innerHTML = ['全部', ...cats].map(c => `<button class="${c === ui.cat ? 'active' : ''}" data-cat="${c}">${c}</button>`).join('');
     const shown = ui.cat === '全部' ? cats : [ui.cat];
@@ -874,9 +891,9 @@
 
   function accountForm(existing, presetId, presetName = '') {
     if (!state.identities.length) { identityForm(); toast('先添加一个邮箱或手机号'); return; }
-    const a = existing || { name: presetName, domain: '', category: '其他', identityIds: presetId ? [presetId] : [], notes: '' };
+    const a = existing || { name: presetName, domain: '', category: '未分类', identityIds: presetId ? [presetId] : [], notes: '' };
     const sel = new Set(identityIdsOf(a));
-    let cat = a.category, icon = customIcon(a) || '', iconSeq = 0;
+    let cat = a.category || '未分类', icon = customIcon(a) || '', iconSeq = 0;
     openSheet(`${bar('取消', existing ? '编辑' : '新网站或 App', existing ? '保存' : '添加', 'id="saveAccount"')}
       <div class="sheet-body form">
         <div class="form-hero" id="aHero"></div>
@@ -891,14 +908,19 @@
         ${idPicksHtml(sel, '用哪个邮箱或手机号注册、绑定的')}
         <p class="hint">可以多选，比如用邮箱注册、再绑定手机号；用微信或 Apple 登录的，选下面的登录账号。</p>
         <div class="sec-title">分类</div>
-        <div class="group"><div class="field"><label>分类</label><input id="aCategory" list="aCatList" value="${esc(cat || '')}" placeholder="手填分类，可自定义" autocomplete="off"><datalist id="aCatList">${CATS.map(c => `<option value="${esc(c)}"></option>`).join('')}</datalist></div></div>
+        <div class="group"><button type="button" class="field link-field ${cat ? 'linked' : ''}" id="aCatBtn"><label>分类</label><span class="link-val">${cat ? `<span>${esc(cat)}</span>` : '<em>未分类</em>'}</span><span class="link-chev">›</span></button></div>
         <div class="sec-title">备注</div>
         <div class="group"><div class="field stack"><textarea id="aNotes" placeholder="是否开了两步验证、用户名、会员到期日">${esc(a.notes || '')}</textarea></div></div>
         <p class="hint">不要在这里填写密码。</p>
       </div>`, { kind: 'form' });
     setTimeout(() => {
-      const setCat = c => { cat = c; const el = $('#aCategory'); if (el) el.value = c; };
-      $('#aCategory')?.addEventListener('input', e => { cat = e.target.value.trim(); });
+      const paintCat = () => {
+        const btn = $('#aCatBtn'), val = btn?.querySelector('.link-val');
+        if (val) val.innerHTML = cat ? `<span>${esc(cat)}</span>` : '<em>未分类</em>';
+        btn?.classList.toggle('linked', !!cat);
+      };
+      const setCat = c => { cat = c || '未分类'; paintCat(); };
+      $('#aCatBtn')?.addEventListener('click', () => showCategoryDialog('account', cat, c => { setCat(c); }, () => renderSites()));
       wirePicks(sel);
       const hero = () => {
         const name = $('#aName').value.trim(), dom = cleanDomain($('#aDomain').value);
@@ -960,7 +982,7 @@
       $('#saveAccount').onclick = () => {
         const name = $('#aName').value.trim();
         if (!name) { const f = $('#nameField'); f.classList.remove('invalid'); void f.offsetWidth; f.classList.add('invalid'); $('#aName').focus(); toast('填一下名称'); return; }
-        const data = { name, handle: $('#aHandle').value.trim(), domain: cleanDomain($('#aDomain').value), category: cat, identityIds: [...sel], notes: $('#aNotes').value.trim() };
+        const data = { name, handle: $('#aHandle').value.trim(), domain: cleanDomain($('#aDomain').value), category: cat || '未分类', identityIds: [...sel], notes: $('#aNotes').value.trim() };
         if (icon) data.icon = icon;   // no key at all when there's no custom icon, for older clients
         let id; rememberApp(data.name, data.domain, data.category, data.icon, !existing || existing.name.toLowerCase() !== name.toLowerCase());
         if (existing) { Object.assign(existing, data); if (!icon) delete existing.icon; id = existing.id; } else { id = uid(); state.accounts.push({ id, createdAt: Date.now(), ...data }); }
@@ -1155,6 +1177,111 @@
     openSheet(`<div class="sheet-body"><div class="alert"><h3>${esc(title)}</h3><p>${text}</p></div>
       <div class="alert-actions"><button class="destructive" id="cOk">${esc(label)}</button><button data-close>取消</button></div></div>`, { kind: 'confirm' });
     setTimeout(() => { $('#cOk').onclick = () => { closeSheet(); fn(); }; }, 0);
+  }
+
+  // 共用的居中分类对话框：选择 + 增删改（含预设删除）。删除后引用条目归「未分类」。
+  // scope: 'account' | 'token'；current: 当前值；onPick(cat): 回填；onChanged(): 列表变更后刷新。
+  function showCategoryDialog(scope, current, onPick, onChanged) {
+    const layer = $('#catDialogLayer'), list = $('#catDialogList'), row = $('#catDialogCustomRow'), input = $('#catDialogInput');
+    if (!layer || !list) return;
+    const defaults = scope === 'token' ? ['未分类', 'AI API', 'GitHub', '云服务', '数据库', '支付', 'OAuth', '其他'] : ['未分类', ...CATS];
+    let cats = loadCats(scope, defaults);
+    let managing = false, editing = null, confirmDel = null; // editing = 要重命名的原名；confirmDel = 待确认删除项
+    const hide = () => { layer.classList.remove('show'); layer.onclick = null; };
+    const changed = () => { storeCats(scope, cats); if (onChanged) onChanged(); };
+    const setCurrent = c => { current = c; if (onPick) onPick(c); };
+
+    const paint = () => {
+      $('#catDialogTitle').textContent = confirmDel ? '确认删除' : managing ? '管理分类' : '选择分类';
+      $('#catDialogManage').textContent = confirmDel ? '返回' : managing ? '完成' : '管理';
+      const isCustom = current && !cats.includes(current);
+      if (confirmDel) {
+        list.innerHTML = `<p class="cat-confirm">删除「${esc(confirmDel)}」？<br><small>使用该分类的条目会归到「未分类」，数据不会丢失。</small></p><button class="cat-danger" id="catDelYes">删除分类</button><button id="catDelNo">取消</button>`;
+        row.hidden = true; return;
+      }
+      list.innerHTML = cats.map(c => {
+        const on = c === (current || '未分类');
+        if (managing) {
+          const fixed = c === '未分类';
+          return `<div class="cat-row" data-cat="${esc(c)}"><button class="cat-rename" data-act="rename" data-cat="${esc(c)}" ${fixed ? 'disabled' : ''}><span>${esc(c)}</span><i>✎</i></button><button class="cat-del" data-act="del" data-cat="${esc(c)}" ${fixed ? 'disabled' : ''} aria-label="删除 ${esc(c)}">−</button></div>`;
+        }
+        return `<button data-cat="${esc(c)}" class="${on ? 'on' : ''}">${esc(c)}${on ? '<span class="tick">✓</span>' : ''}</button>`;
+      }).join('') +
+        (managing
+          ? `<button class="custom" id="catDlgAdd">＋ 新增分类</button>`
+          : `<button class="custom ${isCustom ? 'on' : ''}" id="catDlgCustom">＋ 自定义分类${isCustom ? '<span class="tick">✓</span>' : ''}</button>`);
+      row.hidden = true;
+    };
+
+    const openInput = (mode, old) => {
+      editing = mode === 'rename' ? old : null;
+      row.hidden = false;
+      $('#catDialogOk').textContent = mode === 'rename' ? '保存' : '添加';
+      if (input) { input.value = mode === 'rename' ? old : ''; input.focus(); }
+    };
+    const renameCatsRefs = (oldName, newName) => {
+      if (scope === 'account') {
+        (state.accounts || []).forEach(a => { if (a.category === oldName) a.category = newName; });
+      } else {
+        (Array.isArray(state.tokens) ? state.tokens : []).forEach(t => { if (t.category === oldName) t.category = newName; });
+      }
+    };
+    const clearCatsRefs = name => {
+      if (scope === 'account') {
+        (state.accounts || []).forEach(a => { if (a.category === name) a.category = '未分类'; });
+      } else {
+        (Array.isArray(state.tokens) ? state.tokens : []).forEach(t => { if (t.category === name) t.category = '未分类'; });
+      }
+    };
+    const commit = () => {
+      const v = input?.value.trim(); if (!v) return;
+      if (editing !== null) {
+        if (v !== editing && !cats.includes(v)) {
+          cats[cats.indexOf(editing)] = v; renameCatsRefs(editing, v);
+          if (current === editing) setCurrent(v); changed(); save(); render();
+        }
+      } else if (!cats.includes(v)) {
+        cats.push(v); setCurrent(v); changed();
+        // 选择模式下新增即选中并关闭；管理模式下仅添加，留在管理界面
+        if (!managing) { hide(); onPick(current); return; }
+      }
+      row.hidden = true; editing = null; paint();
+    };
+
+    layer.classList.add('show');
+    layer.onclick = e => { if (e.target === layer) hide(); };
+    $('#catDialogClose').onclick = hide;
+    $('#catDialogManage').onclick = () => {
+      if (confirmDel) { confirmDel = null; paint(); return; }
+      managing = !managing; row.hidden = true; paint();
+    };
+    list.onclick = e => {
+      if (confirmDel) {
+        if (e.target.closest('#catDelYes')) {
+          const name = confirmDel; confirmDel = null;
+          cats = cats.filter(c => c !== name); clearCatsRefs(name);
+          if (current === name) setCurrent('未分类');
+          changed(); save(); render(); paint();
+        } else if (e.target.closest('#catDelNo')) { confirmDel = null; paint(); }
+        return;
+      }
+      if (managing) {
+        const rename = e.target.closest('[data-act="rename"]');
+        if (rename) return openInput('rename', rename.dataset.cat);
+        const del = e.target.closest('[data-act="del"]');
+        if (del) {
+          const name = del.dataset.cat; if (name === '未分类') return;
+          confirmDel = name; paint(); return;
+        }
+        if (e.target.closest('#catDlgAdd')) return openInput('add');
+        return;
+      }
+      const b = e.target.closest('[data-cat]'); if (b) { hide(); onPick(b.dataset.cat); return; }
+      if (e.target.closest('#catDlgCustom')) openInput('add');
+    };
+    $('#catDialogOk').onclick = commit;
+    if (input) input.onkeydown = e => { if (e.key === 'Enter') { e.preventDefault(); commit(); } };
+    paint();
   }
 
   // ---------- card order ----------
@@ -1483,11 +1610,13 @@
       const accountExtra = accounts.length !== n ? `，${accounts.length} 个具体账号` : '';
       $('#graphSummary').textContent = n ? `${identityCount} 个身份，${n} 个平台${accountExtra}` + (linkedTokenCount ? `，${linkedTokenCount} 条已关联密钥` : '') : '';
       if (!n) { box.innerHTML = `<div class="empty"><h3>还没有可以连线的</h3><p>添加一个邮箱或手机号，再给它记几个网站，这里就会连起来。</p><button class="btn-filled" data-new="${identityCount ? 'account' : 'identity'}">${identityCount ? '添加网站或 App' : '添加邮箱或手机号'}</button></div>`; return; }
-      const W = box.clientWidth || 350, L = Math.min(124, Math.round(W * .29));
-      const R = L + Math.max(46, Math.round(W * .12));
-      const T = R + Math.max(92, Math.round(W * .27));
-      const COL_GAP = W >= 560 ? 30 : 22;
-      const AWW = Math.max(68, T - R - COL_GAP), TW = Math.max(0, W - T - 2);
+      // 固定逻辑宽度的画布，外层横向滑动；密钥列贴右并进一步收窄，省下的空间给前两列连线
+      const W = box.clientWidth || 640, L = Math.min(132, Math.round(W * .21));
+      const TW = Math.min(104, Math.max(88, Math.round(W * .15)));
+      const T = W - TW - 14;
+      const R = L + Math.round((T - L) * .48);
+      const COL_GAP = 26;
+      const AWW = Math.max(68, T - R - COL_GAP);
       const paths = [], tpaths = [];
       for (const p of pos) for (const group of groups.filter(group => group.identityIds.includes(p.i.id))) {
         const y1 = p.y, y2 = gy[group.key], mx = (L + R) / 2;
@@ -1567,13 +1696,13 @@
       start() {
         running = true; drawn = false; sel = null;
         const box = $('#mapBox');
-        if (box && built && built === dataVer + ':' + (box.clientWidth || 350)) { apply(); draw(); } else render();
+        if (box && built && built === dataVer + ':' + (box.clientWidth || 640)) { apply(); draw(); } else render();
       },
       stop() { running = false; },
       // build the map while the browser is idle and the tab is hidden, so the first visit only plays the draw-in
       prebuild() {
         clearTimeout(pre); const idle = window.requestIdleCallback || (f => setTimeout(f, 300));
-        pre = setTimeout(() => idle(() => { const box = $('#mapBox'); if (!running && box && built !== dataVer + ':' + (box.clientWidth || 350)) render(); }, { timeout: 2000 }), 400);
+        pre = setTimeout(() => idle(() => { const box = $('#mapBox'); if (!running && box && built !== dataVer + ':' + (box.clientWidth || 640)) render(); }, { timeout: 2000 }), 400);
       },
       rebuild() { if (running) render(); },
       resize() { if (running) { clearTimeout(rz); rz = setTimeout(render, 120); } },
@@ -1734,7 +1863,7 @@
     const cloud = '<svg viewBox="0 0 24 24"><path d="M7 18a4.5 4.5 0 0 1-.6-8.96A6 6 0 0 1 18 9a4 4 0 0 1-.5 9H7Z"/></svg>';
     if (Sync.on) {
       openSheet(`${closeX}<div class="sheet-body form">
-        <div class="form-hero sync-hero" style="--pc:#0a84ff"><img src="icon.png?v=4" class="icon lg" alt=""><b>加密同步已开启</b><p class="sync-state ${Sync.status.state}" id="syncState">${esc(syncLine())}</p></div>
+        <div class="form-hero sync-hero" style="--pc:#0a84ff"><img src="icon.png?v=toki12" class="icon lg" alt=""><b>加密同步已开启</b><p class="sync-state ${Sync.status.state}" id="syncState">${esc(syncLine())}</p></div>
         <div class="group">
           <button class="cell" id="syncNow"><span class="cell-main"><span class="cell-title tint">立即同步</span></span></button>
         </div>
@@ -1803,7 +1932,7 @@
   }
   if (!state.identities.some(i => i.type === ui.kind)) { const t = state.identities.find(i => KINDS.includes(i.type)); if (t) ui.kind = t.type; }
 
-  window.TokiTokens?.install({ getState: () => state, save, render, toast, openSheet, closeSheet, confirmSheet, refreshSheet, makeIcon, favIcon, brand, localIcon, favSources, PRESETS, cleanDomain, customIcon });
+  window.TokiTokens?.install({ getState: () => state, save, render, toast, openSheet, closeSheet, confirmSheet, showCategoryDialog, loadCats, refreshSheet, makeIcon, favIcon, brand, localIcon, favSources, PRESETS, cleanDomain, customIcon });
   paintTheme(); render(); Sync.init(); Sync.listeners.forEach(f => f());
   const first = cur();
   $('#glow').style.setProperty('--accent', first ? first.color : '#3a3a3c'); glowColor = first ? first.color : '#3a3a3c';
